@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CryptoPrice Tracker – Real-Time Crypto Market</title>
+  <meta name="description" content="Track real-time cryptocurrency prices, manage your portfolio, set price alerts, and get AI-driven market analysis – all in one platform." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- Lightweight Charts (TradingView) for candlestick charts -->
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+
+  <!-- ===================== AUTH OVERLAY ===================== -->
+  <div id="auth-overlay" class="auth-overlay active">
+    <div class="auth-bg-animation">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+    <div class="auth-container">
+      <div class="auth-brand">
+        <div class="auth-logo">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="20" fill="url(#logoGrad)"/>
+            <path d="M14 16h8c1.1 0 2 .9 2 2s-.9 2-2 2h-8v-4zM14 20h9c1.1 0 2 .9 2 2s-.9 2-2 2h-9v-4z" fill="white"/>
+            <defs>
+              <linearGradient id="logoGrad" x1="0" y1="0" x2="40" y2="40">
+                <stop offset="0%" stop-color="#6c63ff"/>
+                <stop offset="100%" stop-color="#f093fb"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1 class="auth-title">CryptoPrice Tracker</h1>
+        <p class="auth-subtitle">Your professional crypto command center</p>
+      </div>
+
+      <!-- Tab Switcher -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Login</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <form class="auth-form active" id="form-login" onsubmit="handleFirebaseLogin ? handleFirebaseLogin(event) : handleLogin(event)">
+        <div class="form-group">
+          <label for="login-email">Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉</span>
+            <input type="email" id="login-email" placeholder="you@example.com" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="login-password" placeholder="••••••••" required />
+            <button type="button" class="toggle-pw" onclick="togglePassword('login-password')">👁</button>
+          </div>
+        </div>
+        <div id="login-error" class="auth-error"></div>
+        <button type="submit" class="btn-auth">
+          <span class="btn-text">Sign In</span>
+          <span class="btn-loader hidden">⟳</span>
+        </button>
+        <p class="auth-demo">Demo: <strong>demo@crypto.com</strong> / <strong>demo1234</strong></p>
+      </form>
+
+      <!-- Signup Form -->
+      <form class="auth-form" id="form-signup" onsubmit="handleFirebaseSignup ? handleFirebaseSignup(event) : handleSignup(event)">
+        <div class="form-group">
+          <label for="signup-name">Full Name</label>
+          <div class="input-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="signup-name" placeholder="John Doe" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signup-email">Email Address</label>
+          <div class="input-wrap">
+            <span class="input-icon">✉</span>
+            <input type="email" id="signup-email" placeholder="you@example.com" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="signup-password">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="signup-password" placeholder="Min 8 characters" required minlength="8" />
+            <button type="button" class="toggle-pw" onclick="togglePassword('signup-password')">👁</button>
+          </div>
+        </div>
+        <div id="signup-error" class="auth-error"></div>
+        <button type="submit" class="btn-auth">
+          <span class="btn-text">Create Account</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================== MAIN APP ===================== -->
+  <div id="app" class="app hidden">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="20" fill="url(#sideLogoGrad)"/>
+            <path d="M14 16h8c1.1 0 2 .9 2 2s-.9 2-2 2h-8v-4zM14 20h9c1.1 0 2 .9 2 2s-.9 2-2 2h-9v-4z" fill="white"/>
+            <defs>
+              <linearGradient id="sideLogoGrad" x1="0" y1="0" x2="40" y2="40">
+                <stop offset="0%" stop-color="#6c63ff"/>
+                <stop offset="100%" stop-color="#f093fb"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <span class="brand-name">CryptoPT</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item active" href="#" onclick="navigateTo('dashboard')" id="nav-dashboard">
+          <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+        </a>
+        <a class="nav-item" href="#" onclick="navigateTo('watchlist')" id="nav-watchlist">
+          <span class="nav-icon">⭐</span><span class="nav-label">Watchlist</span>
+        </a>
+        <a class="nav-item" href="#" onclick="navigateTo('portfolio')" id="nav-portfolio">
+          <span class="nav-icon">💼</span><span class="nav-label">Portfolio</span>
+        </a>
+        <a class="nav-item" href="#" onclick="navigateTo('alerts')" id="nav-alerts">
+          <span class="nav-icon">🔔</span><span class="nav-label">Alerts</span>
+          <span class="badge" id="alert-badge">0</span>
+        </a>
+        <a class="nav-item" href="#" onclick="navigateTo('exchange')" id="nav-exchange">
+          <span class="nav-icon">🔄</span><span class="nav-label">Exchange</span>
+        </a>
+        <a class="nav-item" href="#" onclick="navigateTo('news')" id="nav-news">
+          <span class="nav-icon">📰</span><span class="nav-label">News</span>
+        </a>
+        <a class="nav-item" href="#" onclick="navigateTo('chatbot')" id="nav-chatbot">
+          <span class="nav-icon">🤖</span><span class="nav-label">AI Chatbot</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-card">
+          <div class="user-avatar" id="user-avatar">J</div>
+          <div class="user-info">
+            <span class="user-name" id="user-name">John Doe</span>
+            <span class="user-email" id="user-email">john@example.com</span>
+          </div>
+        </div>
+        <button class="btn-logout" onclick="handleFirebaseLogout ? handleFirebaseLogout() : handleLogout()">⏻</button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="main-content">
+
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="page-title" id="page-title">Dashboard</div>
+        <div class="topbar-actions">
+          <div class="search-wrap" id="global-search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="global-search" class="search-input" placeholder="Search coins..." oninput="filterCoins(this.value)" />
+          </div>
+          <select id="global-currency" class="select-control" onchange="changeGlobalCurrency(this.value)" style="margin-left: 0.5rem;">
+            <option value="usd">USD</option>
+            <option value="inr">INR</option>
+            <option value="eur">EUR</option>
+            <option value="gbp">GBP</option>
+            <option value="jpy">JPY</option>
+            <option value="cad">CAD</option>
+            <option value="aud">AUD</option>
+            <option value="sgd">SGD</option>
+          </select>
+          <button class="btn-icon" title="Toggle Dark Mode" onclick="toggleDarkMode()">🌙</button>
+          <button class="btn-icon" title="Refresh Data" onclick="refreshData()">🔄</button>
+          <div class="last-updated" id="last-updated">Updating…</div>
+        </div>
+      </header>
+
+      <!-- ===== PAGES ===== -->
+
+      <!-- DASHBOARD PAGE -->
+      <section class="page active" id="page-dashboard">
+
+        <!-- Market Overview Stats -->
+        <div class="stats-grid" id="market-stats">
+          <div class="stat-card">
+            <div class="stat-label">Global Market Cap</div>
+            <div class="stat-value" id="stat-marketcap">—</div>
+            <div class="stat-change" id="stat-mc-change">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">24h Volume</div>
+            <div class="stat-value" id="stat-volume">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">BTC Dominance</div>
+            <div class="stat-value" id="stat-btc-dom">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Active Coins</div>
+            <div class="stat-value" id="stat-active">—</div>
+          </div>
+        </div>
+
+        <!-- Top Coins Table -->
+        <div class="section-card">
+          <div class="section-header">
+            <h2>Top 100 Cryptocurrencies</h2>
+            <div class="filter-row">
+              <select id="sort-select" class="select-control" onchange="sortCoins(this.value)">
+                <option value="market_cap_desc">Market Cap ↓</option>
+                <option value="volume_desc">Volume ↓</option>
+                <option value="price_asc">Price ↑</option>
+                <option value="price_desc">Price ↓</option>
+                <option value="change_desc">Change ↓</option>
+              </select>
+              <select id="filter-change" class="select-control" onchange="filterByChange(this.value)">
+                <option value="all">All</option>
+                <option value="gainers">Gainers</option>
+                <option value="losers">Losers</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <div id="coins-loading" class="loading-spinner">
+              <div class="spinner"></div>
+              <p>Fetching market data…</p>
+            </div>
+            <table class="coins-table" id="coins-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Price</th>
+                  <th>24h %</th>
+                  <th>Market Cap</th>
+                  <th>Volume</th>
+                  <th>7D Chart</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="coins-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- WATCHLIST PAGE -->
+      <section class="page" id="page-watchlist">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>⭐ My Watchlist</h2>
+            <p class="section-subtitle">Track your favorite coins at a glance</p>
+          </div>
+          <div id="watchlist-empty" class="empty-state">
+            <div class="empty-icon">⭐</div>
+            <h3>No coins in watchlist</h3>
+            <p>Go to the Dashboard and click the ⭐ star to add coins here.</p>
+          </div>
+          <div class="coins-grid" id="watchlist-grid"></div>
+        </div>
+      </section>
+
+      <!-- PORTFOLIO PAGE -->
+      <section class="page" id="page-portfolio">
+        <div class="portfolio-layout">
+
+          <!-- Add Transaction Form -->
+          <div class="section-card">
+            <div class="section-header"><h2>💼 Portfolio</h2></div>
+            <div class="portfolio-form">
+              <h3>Add Transaction</h3>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Coin</label>
+                  <select id="portfolio-coin" class="select-control" onchange="updatePortfolioCoinPrice()">
+                    <option value="">Select Coin…</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>Type</label>
+                  <select id="portfolio-type" class="select-control">
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Amount</label>
+                  <input type="number" id="portfolio-amount" class="form-input" placeholder="0.00" step="any" min="0" oninput="updatePortfolioTotal()" />
+                </div>
+                <div class="form-group">
+                  <label>Price (USD)</label>
+                  <input type="number" id="portfolio-price" class="form-input" placeholder="0.00" step="any" min="0" oninput="updatePortfolioTotal()" />
+                </div>
+                <div class="form-group">
+                  <label>Total</label>
+                  <input type="text" id="portfolio-total" class="form-input" placeholder="$0.00" readonly />
+                </div>
+              </div>
+              <button class="btn-primary" onclick="addPortfolioTransaction()">Add Transaction</button>
+            </div>
+
+            <!-- Portfolio Summary -->
+            <div class="portfolio-summary">
+              <div class="summary-card">
+                <div class="summary-label">Total Invested</div>
+                <div class="summary-value" id="total-invested">$0.00</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Current Value</div>
+                <div class="summary-value" id="current-value">$0.00</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">Profit / Loss</div>
+                <div class="summary-value" id="profit-loss">$0.00</div>
+              </div>
+              <div class="summary-card">
+                <div class="summary-label">ROI</div>
+                <div class="summary-value" id="roi-percent">0%</div>
+              </div>
+            </div>
+
+            <!-- Transactions List -->
+            <div id="transactions-empty" class="empty-state">
+              <div class="empty-icon">💼</div>
+              <h3>No transactions yet</h3>
+              <p>Add your first buy or sell above.</p>
+            </div>
+            <div id="transactions-list" class="transactions-list"></div>
+          </div>
+
+          <!-- Chart -->
+          <div class="section-card chart-card">
+            <h3>Portfolio Allocation</h3>
+            <div class="chart-wrap">
+              <canvas id="portfolio-chart"></canvas>
+              <div id="portfolio-chart-empty" class="chart-empty">Add transactions to see allocation</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ALERTS PAGE -->
+      <section class="page" id="page-alerts">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>🔔 Price Alerts</h2>
+          </div>
+
+          <div class="alert-form">
+            <h3>Set New Alert</h3>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Coin</label>
+                <select id="alert-coin" class="select-control">
+                  <option value="">Select Coin…</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Condition</label>
+                <select id="alert-condition" class="select-control">
+                  <option value="above">Price goes Above</option>
+                  <option value="below">Price goes Below</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Target Price (USD)</label>
+                <input type="number" id="alert-price" class="form-input" placeholder="0.00" step="any" min="0" />
+              </div>
+              <button class="btn-primary" onclick="addAlert()">Set Alert</button>
+            </div>
+          </div>
+
+          <div id="alerts-empty" class="empty-state">
+            <div class="empty-icon">🔔</div>
+            <h3>No alerts set</h3>
+            <p>Set a price alert above to get notified instantly.</p>
+          </div>
+          <div id="alerts-list" class="alerts-list"></div>
+        </div>
+      </section>
+
+      <!-- CRYPTO EXCHANGE PAGE -->
+      <section class="page" id="page-exchange">
+        <div class="exchange-layout">
+
+          <!-- Left: Order Panel -->
+          <div class="section-card exchange-order-panel">
+            <div class="section-header">
+              <h2>🔄 Crypto Exchange</h2>
+              <span class="exchange-balance-badge">💵 Balance: <strong id="ex-balance">$10,000.00</strong></span>
+            </div>
+
+            <!-- Pair Selector -->
+            <div class="exchange-pair-selector">
+              <div class="form-group">
+                <label>Trading Pair</label>
+                <select id="ex-coin" class="select-control" onchange="updateExchangePrice()">
+                  <option value="">Select coin…</option>
+                </select>
+              </div>
+              <div class="ex-live-price">
+                <div class="ex-price-label">Live Price</div>
+                <div class="ex-price-value" id="ex-live-price">—</div>
+                <div class="ex-price-change" id="ex-live-change">—</div>
+              </div>
+            </div>
+
+            <!-- Buy / Sell Tabs -->
+            <div class="ex-order-tabs">
+              <button class="ex-tab active" id="ex-tab-buy" onclick="switchExTab('buy')">🟢 Buy</button>
+              <button class="ex-tab" id="ex-tab-sell" onclick="switchExTab('sell')">🔴 Sell</button>
+            </div>
+
+            <!-- Order Form -->
+            <div class="ex-order-form">
+              <div class="form-group">
+                <label id="ex-amount-label">Amount (USD to spend)</label>
+                <div class="ex-input-wrap">
+                  <span class="ex-input-prefix" id="ex-prefix">$</span>
+                  <input type="number" id="ex-amount" class="form-input" placeholder="0.00" step="any" min="0" oninput="updateExchangePreview()" />
+                </div>
+              </div>
+              <div class="form-group">
+                <label>At Price (USD)</label>
+                <input type="number" id="ex-price-input" class="form-input" placeholder="0.00" step="any" oninput="updateExchangePreview()" />
+              </div>
+              <div class="ex-preview" id="ex-preview">
+                <div class="ex-preview-row">
+                  <span>You will receive</span>
+                  <strong id="ex-preview-crypto">—</strong>
+                </div>
+                <div class="ex-preview-row">
+                  <span>Fee (0.1%)</span>
+                  <strong id="ex-preview-fee">—</strong>
+                </div>
+                <div class="ex-preview-row total">
+                  <span>Total Cost</span>
+                  <strong id="ex-preview-total">—</strong>
+                </div>
+              </div>
+              <button class="btn-exchange" id="ex-submit-btn" onclick="executeExchangeOrder()">
+                🟢 Place Buy Order
+              </button>
+            </div>
+          </div>
+
+          <!-- Middle: Chart + Order Book -->
+          <div class="exchange-center">
+            <div class="section-card">
+              <div class="ex-chart-header">
+                <span id="ex-chart-pair">Select a pair</span>
+                <div class="chart-time-filters" style="margin:0;">
+                  <button class="time-btn active" onclick="loadExchangeChart('1',this)">1D</button>
+                  <button class="time-btn" onclick="loadExchangeChart('7',this)">7D</button>
+                  <button class="time-btn" onclick="loadExchangeChart('30',this)">30D</button>
+                </div>
+              </div>
+              <div class="chart-wrap" style="min-height:260px;">
+                <canvas id="exchange-chart"></canvas>
+                <div id="ex-chart-empty" class="chart-empty">Select a coin to view chart</div>
+              </div>
+            </div>
+
+            <!-- Order Book (simulated) -->
+            <div class="section-card">
+              <h3>📋 Order Book</h3>
+              <div class="order-book" id="order-book">
+                <div class="empty-state" style="padding:1.5rem;">
+                  <p style="color:var(--text-muted)">Select a coin to see order book</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Trade History -->
+          <div class="section-card exchange-history">
+            <h3>🧾 My Trades</h3>
+            <div id="ex-trades-empty" class="empty-state">
+              <div class="empty-icon">🔄</div>
+              <h3>No trades yet</h3>
+              <p>Execute your first order to see history here.</p>
+            </div>
+            <div id="ex-trades-list" class="ex-trades-list"></div>
+
+            <!-- Holdings -->
+            <h3 style="margin-top:1.25rem;">💰 Holdings</h3>
+            <div id="ex-holdings" class="ex-holdings-list">
+              <p style="color:var(--text-muted);font-size:0.82rem;">No holdings yet.</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- NEWS PAGE -->
+      <section class="page" id="page-news">
+        <div class="section-card">
+          <div class="section-header">
+            <h2>📰 Crypto News</h2>
+            <div class="filter-row">
+              <button class="filter-btn active" onclick="filterNews('all', this)">All</button>
+              <button class="filter-btn" onclick="filterNews('bitcoin', this)">Bitcoin</button>
+              <button class="filter-btn" onclick="filterNews('ethereum', this)">Ethereum</button>
+              <button class="filter-btn" onclick="filterNews('defi', this)">DeFi</button>
+              <button class="filter-btn" onclick="filterNews('nft', this)">NFT</button>
+              <button class="filter-btn" onclick="filterNews('regulation', this)">Regulation</button>
+            </div>
+          </div>
+          <div class="news-grid" id="news-grid"></div>
+        </div>
+      </section>
+
+      <!-- AI CHATBOT PAGE -->
+      <section class="page" id="page-chatbot">
+        <div class="chatbot-layout">
+
+          <div class="chat-main section-card">
+            <div class="chat-header">
+              <div class="chat-bot-avatar">
+                <span>🤖</span>
+                <div class="bot-status-dot"></div>
+              </div>
+              <div class="chat-header-info">
+                <h2>CryptoBot</h2>
+                <span class="bot-status-label">Powered by live market data</span>
+              </div>
+              <button class="btn-sm" onclick="clearChat()" title="Clear chat">🗑 Clear</button>
+            </div>
+
+            <!-- Messages window -->
+            <div class="chat-messages" id="chat-messages">
+              <!-- Populated by JS -->
+            </div>
+
+            <!-- Quick prompts -->
+            <div class="quick-prompts" id="quick-prompts">
+              <button class="quick-chip" onclick="sendQuick('What is the price of Bitcoin?')">💰 Bitcoin price</button>
+              <button class="quick-chip" onclick="sendQuick('Who are the top 5 gainers today?')">📈 Top gainers</button>
+              <button class="quick-chip" onclick="sendQuick('Who are the top 5 losers today?')">📉 Top losers</button>
+              <button class="quick-chip" onclick="sendQuick('What is the global market cap?')">🌍 Market cap</button>
+              <button class="quick-chip" onclick="sendQuick('Tell me about Ethereum')">⟠ Ethereum info</button>
+              <button class="quick-chip" onclick="sendQuick('What coins are in my watchlist?')">⭐ My watchlist</button>
+              <button class="quick-chip" onclick="sendQuick('Should I buy BTC now?')">🧠 Buy BTC?</button>
+              <button class="quick-chip" onclick="sendQuick('What is DeFi?')">📚 What is DeFi?</button>
+            </div>
+
+            <!-- Input bar -->
+            <div class="chat-input-bar">
+              <input
+                type="text"
+                id="chat-input"
+                class="chat-input"
+                placeholder="Ask me anything about crypto…"
+                onkeydown="handleChatKey(event)"
+                autocomplete="off"
+              />
+              <button class="chat-send-btn" onclick="handleSendMessage()" title="Send">➤</button>
+            </div>
+          </div>
+
+          <!-- Side panel -->
+          <div class="chat-sidebar">
+            <div class="section-card">
+              <h3>😨 Fear &amp; Greed Index</h3>
+              <div class="fear-greed-wrap" id="fear-greed-wrap"></div>
+            </div>
+            <div class="section-card">
+              <h3>🔥 Trending Now</h3>
+              <div id="chat-trending" class="chat-trending-list"></div>
+            </div>
+            <div class="section-card chat-tips-card">
+              <h3>💡 Try asking…</h3>
+              <ul class="tips-list">
+                <li>"Price of Solana in INR"</li>
+                <li>"Top 3 losers today"</li>
+                <li>"What is my portfolio worth?"</li>
+                <li>"Compare BTC and ETH"</li>
+                <li>"Explain blockchain"</li>
+                <li>"Should I sell Ethereum?"</li>
+              </ul>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- COIN DETAIL MODAL -->
+      <div class="modal-overlay" id="coin-modal" onclick="closeCoinModal(event)">
+        <div class="modal">
+          <button class="modal-close" onclick="closeCoinModal()">✕</button>
+          <div class="modal-header" id="modal-header"></div>
+          <div class="chart-time-filters">
+            <button class="time-btn active" onclick="loadCoinChart('1')">1D</button>
+            <button class="time-btn" onclick="loadCoinChart('7')">7D</button>
+            <button class="time-btn" onclick="loadCoinChart('30')">30D</button>
+            <button class="time-btn" onclick="loadCoinChart('365')">1Y</button>
+          </div>
+          <div class="chart-wrap modal-chart">
+            <div id="coin-detail-chart" style="width: 100%; height: 100%;"></div>
+          </div>
+          <div class="modal-stats" id="modal-stats"></div>
+        </div>
+      </div>
+
+      <!-- TOAST NOTIFICATION -->
+      <div class="toast-container" id="toast-container"></div>
+
+    </main>
+  </div>
+
+  <script type="module" src="firebase-auth.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
