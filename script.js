@@ -48,6 +48,10 @@ var state = {
   currentAnalysisCoin: null,
   darkMode: true,
   alertAudio: null,
+  exBalance: 10000.00,        // Simulated exchange balance
+  exHoldings: {},             // { coinId: { qty, avgPrice } }
+  exTrades: [],               // List of trade objects
+  exChart: null,              // Exchange chart instance
 };
 
 // =============================================
@@ -222,7 +226,16 @@ function loadUserData() {
   state.watchlist = JSON.parse(localStorage.getItem(userKey('watchlist')) || '[]');
   state.portfolio = JSON.parse(localStorage.getItem(userKey('portfolio')) || '[]');
   state.alerts    = JSON.parse(localStorage.getItem(userKey('alerts'))    || '[]');
+  state.exBalance = JSON.parse(localStorage.getItem(userKey('exBalance')) || '10000');
+  state.exHoldings = JSON.parse(localStorage.getItem(userKey('exHoldings')) || '{}');
+  state.exTrades  = JSON.parse(localStorage.getItem(userKey('exTrades'))  || '[]');
   updateAlertBadge();
+}
+
+function saveExData() {
+  localStorage.setItem(userKey('exBalance'), JSON.stringify(state.exBalance));
+  localStorage.setItem(userKey('exHoldings'), JSON.stringify(state.exHoldings));
+  localStorage.setItem(userKey('exTrades'), JSON.stringify(state.exTrades));
 }
 
 function saveWatchlist()  { localStorage.setItem(userKey('watchlist'), JSON.stringify(state.watchlist)); }
@@ -641,7 +654,7 @@ function renderWatchlist() {
 // PORTFOLIO
 // =============================================
 function populateDropdowns() {
-  const selectors = ['portfolio-coin', 'alert-coin'];
+  const selectors = ['portfolio-coin', 'alert-coin', 'ex-coin'];
   selectors.forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -1610,7 +1623,372 @@ function generateBotResponse(input) {
   return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
-// ---- Response Builders ----
+// =============================================
+// CRYPTO EXCHANGE LOGIC
+// =============================================
+let exchangeState = {
+  mode: 'buy', // buy or sell
+  selectedCoinId: null,
+};
+
+function initExchangePage() {
+  updateExchangeBalanceDisplay();
+  renderExchangeHistory();
+  
+  // Select first coin by default if none selected
+  const el = document.getElementById('ex-coin');
+  if (el && !el.value && state.allCoins.length > 0) {
+    el.value = state.allCoins[0].id;
+    updateExchangePrice();
+  }
+}
+
+function updateExchangeBalanceDisplay() {
+  document.getElementById('ex-balance').textContent = '$' + state.exBalance.toLocaleString(undefined, { minimumFractionDigits: 2 });
+}
+
+function updateExchangePrice() {
+  const coinId = document.getElementById('ex-coin').value;
+  exchangeState.selectedCoinId = coinId;
+  
+  const coin = state.allCoins.find(c => c.id === coinId);
+  const priceEl = document.getElementById('ex-live-price');
+  const changeEl = document.getElementById('ex-live-change');
+  const pairEl = document.getElementById('ex-chart-pair');
+
+  if (!coin) {
+    priceEl.textContent = '—';
+    changeEl.textContent = '—';
+    pairEl.textContent = 'Select a pair';
+    document.getElementById('ex-chart-empty').style.display = 'flex';
+    return;
+  }
+
+  priceEl.textContent = formatPrice(coin.current_price);
+  const change = coin.price_change_percentage_24h || 0;
+  changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
+  changeEl.className = 'ex-price-change ' + (change >= 0 ? 'positive' : 'negative');
+  
+  pairEl.textContent = `${coin.name} / USD`;
+  document.getElementById('ex-price-input').value = coin.current_price.toFixed(2);
+  
+  document.getElementById('ex-chart-empty').style.display = 'none';
+  loadExchangeChart('1');
+  renderOrderBook(coinId);
+  updateExchangePreview();
+}
+
+function switchExTab(mode) {
+  exchangeState.mode = mode;
+  const buyTab = document.getElementById('ex-tab-buy');
+  const sellTab = document.getElementById('ex-tab-sell');
+  
+  buyTab.classList.toggle('active', mode === 'buy');
+  buyTab.classList.toggle('buy-active', mode === 'buy');
+  sellTab.classList.toggle('active', mode === 'sell');
+  sellTab.classList.toggle('sell-active', mode === 'sell');
+  
+  // Accessibility & UI updates
+  const label = document.getElementById('ex-amount-label');
+  const submitBtn = document.getElementById('ex-submit-btn');
+  const prefix = document.getElementById('ex-prefix');
+  
+  if (mode === 'buy') {
+    label.textContent = 'Amount (USD to spend)';
+    prefix.textContent = '$';
+    submitBtn.innerHTML = '🟢 Place Buy Order';
+    submitBtn.className = 'btn-exchange buy-mode';
+  } else {
+    label.textContent = 'Amount (Crypto to sell)';
+    prefix.textContent = '₿';
+    submitBtn.innerHTML = '🔴 Place Sell Order';
+    submitBtn.className = 'btn-exchange sell-mode';
+  }
+  
+  updateExchangePreview();
+}
+
+function updateExchangePreview() {
+  const amountInput = document.getElementById('ex-amount');
+  const priceInput = document.getElementById('ex-price-input');
+  const type = exchangeState.mode;
+  
+  const amount = parseFloat(amountInput.value) || 0;
+  const price = parseFloat(priceInput.value) || 0;
+  
+  const cryptoEl = document.getElementById('ex-preview-crypto');
+  const feeEl = document.getElementById('ex-preview-fee');
+  const totalEl = document.getElementById('ex-preview-total');
+  
+  const coin = state.allCoins.find(c => c.id === exchangeState.selectedCoinId);
+  const sym = coin ? coin.symbol.toUpperCase() : 'Units';
+
+  if (amount <= 0 || price <= 0) {
+    cryptoEl.textContent = '—';
+    feeEl.textContent = '—';
+    totalEl.textContent = '—';
+    return;
+  }
+
+  let receive, fee, total;
+  
+  if (type === 'buy') {
+    // spend USD, get crypto
+    total = amount;
+    fee = total * 0.001; // 0.1% fee
+    const net = total - fee;
+    receive = net / price;
+    
+    cryptoEl.textContent = receive.toFixed(6) + ' ' + sym;
+    feeEl.textContent = '$' + fee.toFixed(2);
+    totalEl.textContent = '$' + total.toFixed(2);
+  } else {
+    // sell crypto, get USD
+    const cryptoAmount = amount;
+    const grossVal = cryptoAmount * price;
+    fee = grossVal * 0.001;
+    total = grossVal - fee; // net USD received
+    
+    cryptoEl.textContent = '$' + total.toFixed(2);
+    feeEl.textContent = '$' + fee.toFixed(2);
+    totalEl.textContent = cryptoAmount + ' ' + sym;
+  }
+}
+
+async function executeExchangeOrder() {
+  const coinId = exchangeState.selectedCoinId;
+  const mode = exchangeState.mode;
+  const amount = parseFloat(document.getElementById('ex-amount').value) || 0;
+  const price = parseFloat(document.getElementById('ex-price-input').value) || 0;
+
+  if (!coinId || amount <= 0 || price <= 0) {
+    showToast('Please enter a valid amount.', 'error');
+    return;
+  }
+
+  const coin = state.allCoins.find(c => c.id === coinId);
+  if (!coin) return;
+
+  if (mode === 'buy') {
+    if (amount > state.exBalance) {
+      showToast('Insufficient balance!', 'error');
+      return;
+    }
+    
+    // Process Buy
+    const fee = amount * 0.001;
+    const netUsd = amount - fee;
+    const cryptoQty = netUsd / price;
+    
+    state.exBalance -= amount;
+    
+    // Update holdings
+    if (!state.exHoldings[coinId]) {
+      state.exHoldings[coinId] = { qty: 0, avgPrice: 0 };
+    }
+    const h = state.exHoldings[coinId];
+    const totalCost = (h.qty * h.avgPrice) + netUsd;
+    h.qty += cryptoQty;
+    h.avgPrice = totalCost / h.qty;
+    
+    addExchangeTrade(coin, 'buy', cryptoQty, price, amount);
+    showToast(`Successfully bought ${cryptoQty.toFixed(4)} ${coin.symbol.toUpperCase()}`, 'success');
+  } else {
+    // Process Sell
+    const h = state.exHoldings[coinId];
+    if (!h || h.qty < amount) {
+      showToast(`Insufficient ${coin.symbol.toUpperCase()} holdings!`, 'error');
+      return;
+    }
+    
+    const grossUsd = amount * price;
+    const fee = grossUsd * 0.001;
+    const netUsd = grossUsd - fee;
+    
+    state.exBalance += netUsd;
+    h.qty -= amount;
+    if (h.qty <= 0.00000001) delete state.exHoldings[coinId];
+    
+    addExchangeTrade(coin, 'sell', amount, price, netUsd);
+    showToast(`Successfully sold ${amount} ${coin.symbol.toUpperCase()}`, 'success');
+  }
+
+  saveExData();
+  updateExchangeBalanceDisplay();
+  renderExchangeHistory();
+  document.getElementById('ex-amount').value = '';
+  updateExchangePreview();
+}
+
+function addExchangeTrade(coin, type, qty, price, total) {
+  const trade = {
+    id: Date.now(),
+    coinId: coin.id,
+    coinName: coin.name,
+    symbol: coin.symbol,
+    image: coin.image,
+    type, qty, price, total,
+    date: new Date().toISOString()
+  };
+  state.exTrades.unshift(trade);
+  if (state.exTrades.length > 50) state.exTrades.pop();
+}
+
+function renderExchangeHistory() {
+  const list = document.getElementById('ex-trades-list');
+  const empty = document.getElementById('ex-trades-empty');
+  list.innerHTML = '';
+
+  if (state.exTrades.length === 0) {
+    empty.style.display = 'flex';
+  } else {
+    empty.style.display = 'none';
+    state.exTrades.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'ex-trade-item';
+      item.innerHTML = `
+        <div class="ex-trade-header">
+          <span class="ex-trade-badge ${t.type}">${t.type}</span>
+          <span class="ex-trade-coin">${t.coinName}</span>
+          <span class="ex-trade-time">${new Date(t.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+        </div>
+        <div class="ex-trade-details">
+          ${t.qty.toFixed(4)} @ ${formatPrice(t.price)} = ${formatPrice(t.total)}
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  // Render holdings
+  const holdingsEl = document.getElementById('ex-holdings');
+  holdingsEl.innerHTML = '';
+  const holdingsKeys = Object.keys(state.exHoldings);
+  
+  if (holdingsKeys.length === 0) {
+    holdingsEl.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">No holdings yet.</p>';
+  } else {
+    holdingsKeys.forEach(id => {
+      const h = state.exHoldings[id];
+      const coin = state.allCoins.find(c => c.id === id);
+      if (!coin) return;
+      
+      const val = h.qty * coin.current_price;
+      const item = document.createElement('div');
+      item.className = 'ex-holding-item';
+      item.innerHTML = `
+        <img class="ex-holding-img" src="${coin.image}" />
+        <span class="ex-holding-name">${coin.symbol.toUpperCase()}</span>
+        <div style="text-align:right">
+          <div class="ex-holding-qty">${h.qty.toFixed(4)}</div>
+          <div class="ex-holding-value">${formatPrice(val)}</div>
+        </div>
+      `;
+      holdingsEl.appendChild(item);
+    });
+  }
+}
+
+async function loadExchangeChart(days, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  const coinId = exchangeState.selectedCoinId;
+  if (!coinId) return;
+
+  const container = document.getElementById('exchange-chart');
+  if (state.exChart) { state.exChart.destroy(); }
+
+  try {
+    const data = await fetchCoinHistory(coinId, days);
+    const prices = data.prices;
+    
+    const labels = prices.map(p => {
+      const date = new Date(p[0]);
+      return days === '1' ? date.toLocaleTimeString([], {hour:'2-digit'}) : date.toLocaleDateString([], {month:'short', day:'numeric'});
+    });
+    
+    const values = prices.map(p => p[1]);
+
+    const ctx = container.getContext('2d');
+    state.exChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          borderColor: '#6c63ff',
+          backgroundColor: 'rgba(108, 99, 255, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8b8fa8', font: { size: 10 } } }
+        }
+      }
+    });
+  } catch (err) {
+    console.warn('Exchange chart fail:', err);
+  }
+}
+
+function renderOrderBook(coinId) {
+  const coin = state.allCoins.find(c => c.id === coinId);
+  if (!coin) return;
+  
+  const midPrice = coin.current_price;
+  const container = document.getElementById('order-book');
+  
+  let html = `
+    <div class="order-book-header">
+      <span>Price</span>
+      <span style="text-align:right">Amount</span>
+      <span style="text-align:right">Total</span>
+    </div>
+  `;
+
+  // Asks (Sells) - Red
+  for (let i = 5; i > 0; i--) {
+    const p = midPrice * (1 + (i * 0.001));
+    const a = Math.random() * 2;
+    html += `
+      <div class="order-book-row ask">
+        <span class="col-price">${p.toFixed(2)}</span>
+        <span style="text-align:right">${a.toFixed(3)}</span>
+        <span style="text-align:right">${(p*a).toFixed(2)}</span>
+      </div>
+    `;
+  }
+
+  // Spread
+  html += `<div class="ob-spread">Spread: ${(midPrice * 0.001).toFixed(2)} USD</div>`;
+
+  // Bids (Buys) - Green
+  for (let i = 1; i <= 5; i++) {
+    const p = midPrice * (1 - (i * 0.001));
+    const a = Math.random() * 2;
+    html += `
+      <div class="order-book-row bid">
+        <span class="col-price">${p.toFixed(2)}</span>
+        <span style="text-align:right">${a.toFixed(3)}</span>
+        <span style="text-align:right">${(p*a).toFixed(2)}</span>
+      </div>
+    `;
+  }
+
+  container.innerHTML = html;
+}
+
+// ---- Response Builders ---- SECTION CONTINUES BELOW
 
 function buildTopTable(type, n) {
   if (state.allCoins.length === 0) return '⚠️ Market data not loaded yet. Please wait a moment.';
