@@ -26,6 +26,50 @@ function userRef(uid) {
   return doc(db, "users", uid);
 }
 
+// ── LocalStorage Backup (fallback when Firebase auth expires) ──
+
+const LS_KEY = 'cpt_user_data';
+
+function saveToLocalBackup() {
+  try {
+    const backup = {
+      watchlist: window.state?.watchlist || [],
+      portfolio: window.state?.portfolio || [],
+      alerts: window.state?.alerts || [],
+      exBalance: window.state?.exBalance ?? 10000,
+      exHoldings: window.state?.exHoldings || {},
+      exTrades: window.state?.exTrades || [],
+      savedAt: Date.now()
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(backup));
+    console.log('[firebase-db] ✅ Data backed up to localStorage');
+  } catch (e) {
+    console.warn('[firebase-db] LocalStorage backup failed:', e);
+  }
+}
+
+function loadFromLocalBackup() {
+  try {
+    const saved = localStorage.getItem(LS_KEY);
+    if (!saved) return null;
+    const data = JSON.parse(saved);
+    // Check if backup is less than 7 days old
+    if (Date.now() - data.savedAt > 7 * 24 * 60 * 60 * 1000) {
+      localStorage.removeItem(LS_KEY);
+      return null;
+    }
+    console.log('[firebase-db] ✅ Loaded data from localStorage backup');
+    return data;
+  } catch (e) {
+    console.warn('[firebase-db] LocalStorage load failed:', e);
+    return null;
+  }
+}
+
+function hasLocalBackup() {
+  return localStorage.getItem(LS_KEY) !== null;
+}
+
 /**
  * ✅ FIX: Reset ALL user-specific state to clean defaults
  * before loading the new user's data.
@@ -96,18 +140,21 @@ function patchSaves(uid) {
     const data = window.state.watchlist || [];
     lsSet('watchlist', data);
     savePartial(uid, { watchlist: data });
+    saveToLocalBackup(); // ✅ Backup to localStorage
   };
 
   window.savePortfolio = function () {
     const data = window.state.portfolio || [];
     lsSet('portfolio', data);
     savePartial(uid, { portfolio: data });
+    saveToLocalBackup(); // ✅ Backup to localStorage
   };
 
   window.saveAlerts = function () {
     const data = window.state.alerts || [];
     lsSet('alerts', data);
     savePartial(uid, { alerts: data });
+    saveToLocalBackup(); // ✅ Backup to localStorage
   };
 
   window.saveExData = function () {
@@ -118,6 +165,7 @@ function patchSaves(uid) {
     lsSet('exHoldings', holdings);
     lsSet('exTrades',   trades);
     savePartial(uid, { exBalance: balance, exHoldings: holdings, exTrades: trades });
+    saveToLocalBackup(); // ✅ Backup to localStorage
   };
 
   console.log("[firebase-db] ✅ Save functions wired to Firestore for uid:", uid);
@@ -144,5 +192,9 @@ window.__dbReady = async function (uid) {
   patchSaves(uid);       // override all save functions to use Firestore
   await loadFromFirestore(uid);  // pre-load so bootApp renders correct data
 };
+
+// ✅ NEW: Expose backup functions for use by auth module
+window.loadFromLocalBackup = loadFromLocalBackup;
+window.hasLocalBackup = hasLocalBackup;
 
 console.log("[firebase-db] Module loaded.");

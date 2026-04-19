@@ -65,6 +65,9 @@ window.handleFirebaseSignup = async (e) => {
 
 // ── Logout ───────────────────────────────────────────────────
 window.handleFirebaseLogout = async () => {
+  // ✅ Mark as intentional logout (not token expiration)
+  window.__intentionalLogout = true;
+  
   if (auth) {
     await signOut(auth);
     // onAuthStateChanged handles the rest
@@ -100,26 +103,77 @@ function setupAuthListeners() {
       if (typeof window.showToast === 'function') window.showToast('Welcome back! 👋', 'success');
 
     } else {
-      // ── USER LOGGED OUT ─────────────────────────────────
-      // ✅ FIX: Wipe ALL user data from memory immediately
-      //    so it is never visible to the next login session.
-      if (window.state) {
-        window.state.watchlist   = [];
-        window.state.portfolio   = [];
-        window.state.alerts      = [];
-        window.state.exBalance   = 10000;
-        window.state.exHoldings  = {};
-        window.state.exTrades    = [];
-        window.state.currentUser = null;
-        window.state.allCoins    = [];
-        window.state.filteredCoins = [];
+      // ── USER LOGGED OUT ───────────────────────────────────
+      const isIntentional = window.__intentionalLogout === true;
+      window.__intentionalLogout = false; // Reset flag
+      
+      if (isIntentional) {
+        // ✅ Intentional logout: clear everything including backup
+        localStorage.removeItem('cpt_user_data'); // Clear backup too
+        
+        if (window.state) {
+          window.state.watchlist   = [];
+          window.state.portfolio   = [];
+          window.state.alerts      = [];
+          window.state.exBalance   = 10000;
+          window.state.exHoldings  = {};
+          window.state.exTrades    = [];
+          window.state.currentUser = null;
+          window.state.allCoins    = [];
+          window.state.filteredCoins = [];
+        }
+
+        if (window.state?.refreshTimer) clearInterval(window.state.refreshTimer);
+
+        document.getElementById('app').classList.add('hidden');
+        document.getElementById('auth-overlay').classList.add('active');
+        
+        if (typeof window.showToast === 'function') {
+          window.showToast('Logged out successfully.', 'info');
+        }
+      } else {
+        // ✅ Token expired: try to restore from localStorage backup
+        const localBackup = typeof window.loadFromLocalBackup === 'function' 
+          ? window.loadFromLocalBackup() 
+          : null;
+        
+        if (localBackup) {
+          if (window.state) {
+            window.state.watchlist   = localBackup.watchlist || [];
+            window.state.portfolio   = localBackup.portfolio || [];
+            window.state.alerts      = localBackup.alerts || [];
+            window.state.exBalance   = localBackup.exBalance ?? 10000;
+            window.state.exHoldings  = localBackup.exHoldings || {};
+            window.state.exTrades    = localBackup.exTrades || [];
+          }
+          console.log('[firebase-auth] ✅ Data restored from localStorage after token expiry');
+          
+          if (typeof window.showToast === 'function') {
+            window.showToast('Session expired. Data restored from backup.', 'info');
+          }
+          // Don't hide app - keep user logged in with restored data
+          return;
+        }
+
+        // No backup exists - clear everything
+        if (window.state) {
+          window.state.watchlist   = [];
+          window.state.portfolio   = [];
+          window.state.alerts      = [];
+          window.state.exBalance   = 10000;
+          window.state.exHoldings  = {};
+          window.state.exTrades    = [];
+          window.state.currentUser = null;
+          window.state.allCoins    = [];
+          window.state.filteredCoins = [];
+        }
+
+        localStorage.removeItem('cpt_session');
+        if (window.state?.refreshTimer) clearInterval(window.state.refreshTimer);
+
+        document.getElementById('app').classList.add('hidden');
+        document.getElementById('auth-overlay').classList.add('active');
       }
-
-      localStorage.removeItem('cpt_session');
-      if (window.state?.refreshTimer) clearInterval(window.state.refreshTimer);
-
-      document.getElementById('app').classList.add('hidden');
-      document.getElementById('auth-overlay').classList.add('active');
     }
   });
 }
