@@ -4,6 +4,7 @@ import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, up
 const firebaseConfig = {
   apiKey: "AIzaSyCoRklAVI5FXMTBBE0YcG2NW9LjjASSqOU",
   authDomain: "collageproject-crypto.firebaseapp.com",
+  databaseURL: "https://collageproject-crypto-default-rtdb.firebaseio.com",
   projectId: "collageproject-crypto",
   storageBucket: "collageproject-crypto.firebasestorage.app",
   messagingSenderId: "1013491160294",

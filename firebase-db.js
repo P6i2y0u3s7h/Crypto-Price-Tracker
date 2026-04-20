@@ -1,7 +1,13 @@
 // ============================================================
 //  firebase-db.js  –  Firestore persistence layer for CryptoPT
-//  FIX: Clears previous user's state before loading new user's
-//       data, preventing watchlist/portfolio cross-contamination.
+//
+//  FIXES APPLIED:
+//  1. clearUserState() wipes previous user's data before loading new user's
+//  2. patchSaves() correctly patches all 4 save functions to write to Firestore
+//  3. loadUserData is replaced with a no-op after __dbReady pre-loads data,
+//     preventing bootApp() from overwriting Firestore state with empty localStorage
+//  4. window.userKey is used correctly (script.js exposes it on window)
+//  5. All data groups: watchlist, portfolio, alerts, exchange → saved to Firestore
 // ============================================================
 
 import {
@@ -27,10 +33,8 @@ function userRef(uid) {
 }
 
 /**
- * ✅ FIX: Reset ALL user-specific state to clean defaults
- * before loading the new user's data.
- * This prevents the previous user's watchlist/portfolio
- * from showing up for the newly logged-in user.
+ * Reset ALL user-specific state to clean defaults before loading
+ * the new user's data. Prevents previous user's data from leaking.
  */
 function clearUserState() {
   window.state = window.state || {};
@@ -76,6 +80,7 @@ async function loadFromFirestore(uid) {
 async function savePartial(uid, payload) {
   try {
     await setDoc(userRef(uid), payload, { merge: true });
+    console.log("[firebase-db] ✅ Saved to Firestore:", Object.keys(payload));
   } catch (err) {
     console.error("[firebase-db] Save failed:", err, payload);
   }
@@ -85,31 +90,38 @@ async function savePartial(uid, payload) {
 
 function patchSaves(uid) {
 
+  // Also write to localStorage as a local cache using the key helper
+  // from script.js (exposed on window so firebase-db can access it).
   function lsSet(key, value) {
     try {
-      if (typeof window.userKey === 'function')
+      if (typeof window.userKey === 'function') {
         localStorage.setItem(window.userKey(key), JSON.stringify(value));
+      }
     } catch (_) {}
   }
 
+  // ── Watchlist ──
   window.saveWatchlist = function () {
     const data = window.state.watchlist || [];
     lsSet('watchlist', data);
     savePartial(uid, { watchlist: data });
   };
 
+  // ── Portfolio ──
   window.savePortfolio = function () {
     const data = window.state.portfolio || [];
     lsSet('portfolio', data);
     savePartial(uid, { portfolio: data });
   };
 
+  // ── Alerts ──
   window.saveAlerts = function () {
     const data = window.state.alerts || [];
     lsSet('alerts', data);
     savePartial(uid, { alerts: data });
   };
 
+  // ── Exchange data (balance + holdings + trades) ──
   window.saveExData = function () {
     const balance  = window.state.exBalance  ?? 10000;
     const holdings = window.state.exHoldings ?? {};
@@ -124,13 +136,25 @@ function patchSaves(uid) {
 }
 
 /**
- * Patch loadUserData so bootApp() pulls from Firestore.
- * The async version means bootApp must also await it.
+ * Patch loadUserData so bootApp() does NOT overwrite Firestore-loaded state
+ * with empty localStorage data.
+ *
+ * WHY: bootApp() calls loadUserData() synchronously. By the time bootApp()
+ * runs, __dbReady has already loaded Firestore data into window.state.
+ * If we let the original loadUserData() run, it reads localStorage
+ * (which is empty for new logins) and zeros out the Firestore data.
+ *
+ * FIX: Replace loadUserData with a lightweight function that only
+ * refreshes UI derived from the already-correct window.state.
  */
-function patchLoad(uid) {
-  window.loadUserData = async function () {
-    await loadFromFirestore(uid);
-    if (typeof window.updateAlertBadge === 'function') window.updateAlertBadge();
+function patchLoad() {
+  window.loadUserData = function () {
+    // Data is already in window.state (pre-loaded by __dbReady).
+    // Just refresh UI elements that depend on state — do NOT touch state itself.
+    if (typeof window.updateAlertBadge === 'function') {
+      window.updateAlertBadge();
+    }
+    console.log("[firebase-db] loadUserData() — using pre-loaded Firestore state.");
   };
 }
 
@@ -139,10 +163,11 @@ function patchLoad(uid) {
 // BEFORE bootApp() — so state is clean and data is loaded first.
 
 window.__dbReady = async function (uid) {
-  clearUserState();      // ✅ wipe previous user's data from memory
-  patchLoad(uid);        // override loadUserData to use Firestore
-  patchSaves(uid);       // override all save functions to use Firestore
-  await loadFromFirestore(uid);  // pre-load so bootApp renders correct data
+  clearUserState();             // ✅ wipe previous user's data from memory
+  patchLoad();                  // ✅ prevent bootApp() from overwriting with localStorage
+  patchSaves(uid);              // ✅ wire all 4 save functions to Firestore
+  await loadFromFirestore(uid); // ✅ pre-load data so bootApp renders correct state
+  console.log("[firebase-db] __dbReady complete for uid:", uid);
 };
 
 console.log("[firebase-db] Module loaded.");

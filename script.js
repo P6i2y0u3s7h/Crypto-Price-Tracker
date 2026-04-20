@@ -73,11 +73,21 @@ function initApp() {
     if (curSelect) curSelect.value = savedCurrency;
   }
 
-  // Check existing session
+  // FIX: Do NOT call bootApp() here when Firebase is present.
+  // firebase-auth.js onAuthStateChanged will fire and call __dbReady + bootApp.
+  // Calling bootApp here would race with Firebase and load empty localStorage data
+  // before Firestore data is ready.
+  //
+  // We only call bootApp() directly if there's a local session AND no Firebase module.
   const saved = localStorage.getItem('cpt_session');
   if (saved) {
     state.currentUser = JSON.parse(saved);
-    bootApp();
+    // If firebase-db is present, it will call bootApp via onAuthStateChanged.
+    // Only boot directly if Firebase module hasn't patched __dbReady yet.
+    if (typeof window.__dbReady !== 'function') {
+      bootApp();
+    }
+    // If __dbReady IS available, Firebase onAuthStateChanged handles bootApp.
   }
 
   // Seed demo user
@@ -110,8 +120,13 @@ function bootApp() {
   // Populate user info
   updateUserDisplay();
 
-  // Load saved data
-  loadUserData();
+  // Load saved data — if firebase-db is loaded, this is a no-op (data already in state).
+  // If running without Firebase (local fallback), this loads from localStorage.
+  if (typeof window.loadUserData === 'function') {
+    window.loadUserData();
+  } else {
+    loadUserData();
+  }
 
   // Fetch market data
   fetchAllCoins();
@@ -224,26 +239,34 @@ function updateUserDisplay() {
 function userKey(key) {
   return `cpt_${state.currentUser?.email}_${key}`;
 }
+// FIX: Expose userKey on window so firebase-db.js can call it for localStorage cache
+window.userKey = userKey;
 
 function loadUserData() {
-  state.watchlist = JSON.parse(localStorage.getItem(userKey('watchlist')) || '[]');
-  state.portfolio = JSON.parse(localStorage.getItem(userKey('portfolio')) || '[]');
-  state.alerts    = JSON.parse(localStorage.getItem(userKey('alerts'))    || '[]');
-  state.exBalance = JSON.parse(localStorage.getItem(userKey('exBalance')) || '10000');
+  state.watchlist  = JSON.parse(localStorage.getItem(userKey('watchlist'))  || '[]');
+  state.portfolio  = JSON.parse(localStorage.getItem(userKey('portfolio'))  || '[]');
+  state.alerts     = JSON.parse(localStorage.getItem(userKey('alerts'))     || '[]');
+  state.exBalance  = JSON.parse(localStorage.getItem(userKey('exBalance'))  || '10000');
   state.exHoldings = JSON.parse(localStorage.getItem(userKey('exHoldings')) || '{}');
-  state.exTrades  = JSON.parse(localStorage.getItem(userKey('exTrades'))  || '[]');
+  state.exTrades   = JSON.parse(localStorage.getItem(userKey('exTrades'))   || '[]');
   updateAlertBadge();
 }
 
+// FIX: Expose save functions on window so firebase-db.js can override them
+// with Firestore-aware versions. The overrides happen AFTER this script loads.
 function saveExData() {
-  localStorage.setItem(userKey('exBalance'), JSON.stringify(state.exBalance));
+  localStorage.setItem(userKey('exBalance'),  JSON.stringify(state.exBalance));
   localStorage.setItem(userKey('exHoldings'), JSON.stringify(state.exHoldings));
-  localStorage.setItem(userKey('exTrades'), JSON.stringify(state.exTrades));
+  localStorage.setItem(userKey('exTrades'),   JSON.stringify(state.exTrades));
 }
+window.saveExData = saveExData;
 
-function saveWatchlist()  { localStorage.setItem(userKey('watchlist'), JSON.stringify(state.watchlist)); }
-function savePortfolio()  { localStorage.setItem(userKey('portfolio'), JSON.stringify(state.portfolio)); }
-function saveAlerts()     { localStorage.setItem(userKey('alerts'),    JSON.stringify(state.alerts)); }
+function saveWatchlist() { localStorage.setItem(userKey('watchlist'), JSON.stringify(state.watchlist)); }
+function savePortfolio() { localStorage.setItem(userKey('portfolio'), JSON.stringify(state.portfolio)); }
+function saveAlerts()    { localStorage.setItem(userKey('alerts'),    JSON.stringify(state.alerts)); }
+window.saveWatchlist = saveWatchlist;
+window.savePortfolio = savePortfolio;
+window.saveAlerts    = saveAlerts;
 
 // =============================================
 // NAVIGATION
@@ -411,20 +434,38 @@ async function fetchCoinHistory(coinId, days) {
     if (now - cached.timestamp < CACHE_DURATION) return cached.data;
   }
 
-  try {
-    const url = `${CONFIG.COINGECKO_BASE}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`;
-    const res = await fetch(url);
-    
-    if (res.status === 429) throw new Error('Rate limit exceeded');
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    
-    const data = await res.json();
-    state.chartCache[cacheKey] = { data, timestamp: now };
-    return data;
-  } catch (err) {
-    console.error('fetchCoinHistory error:', err);
-    throw err;
+  const currency = CONFIG.CURRENCY || 'usd';
+  const urls = [
+    `${CONFIG.COINGECKO_BASE}/coins/${coinId}/market_chart?vs_currency=${currency}&days=${days}`,
+  ];
+  if (currency !== 'usd') {
+    urls.push(`${CONFIG.COINGECKO_BASE}/coins/${coinId}/market_chart?vs_currency=usd&days=${days}`);
   }
+
+  let lastErr;
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (res.status === 429) throw new Error('Rate limit exceeded');
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+      const data = await res.json();
+      if (!data || !data.prices || data.prices.length === 0) throw new Error('No data available');
+
+      state.chartCache[cacheKey] = { data, timestamp: now };
+      return data;
+    } catch (err) {
+      lastErr = err;
+      console.warn('fetchCoinHistory attempt failed:', err.message);
+    }
+  }
+
+  console.error('fetchCoinHistory all attempts failed:', lastErr);
+  throw lastErr;
 }
 
 async function fetchCoinOHLC(coinId, days) {
@@ -445,39 +486,39 @@ async function fetchCoinOHLC(coinId, days) {
     }
   }
 
-  try {
-    const url = `${CONFIG.COINGECKO_BASE}/coins/${coinId}/ohlc?vs_currency=${CONFIG.CURRENCY}&days=${ohlcDays}`;
-    let res = await fetch(url);
-    
-    if (res.status === 429) {
-      throw new Error('Rate limit exceeded');
-    }
-    
-    if (!res.ok && CONFIG.CURRENCY !== 'usd') {
-      console.warn(`Failed to fetch in ${CONFIG.CURRENCY}, falling back to USD...`);
-      const fallbackUrl = `${CONFIG.COINGECKO_BASE}/coins/${coinId}/ohlc?vs_currency=usd&days=${ohlcDays}`;
-      res = await fetch(fallbackUrl);
-    }
-
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
-    
-    const data = await res.json();
-    
-    if (!data || data.length === 0) {
-      throw new Error('No data available');
-    }
-
-    // Save to cache
-    state.chartCache[cacheKey] = {
-      data: data,
-      timestamp: now
-    };
-
-    return data;
-  } catch (err) {
-    console.error('fetchCoinOHLC error:', err);
-    throw err;
+  const currency = CONFIG.CURRENCY || 'usd';
+  const urls = [
+    `${CONFIG.COINGECKO_BASE}/coins/${coinId}/ohlc?vs_currency=${currency}&days=${ohlcDays}`,
+  ];
+  // If non-USD, also try USD as a fallback currency
+  if (currency !== 'usd') {
+    urls.push(`${CONFIG.COINGECKO_BASE}/coins/${coinId}/ohlc?vs_currency=usd&days=${ohlcDays}`);
   }
+
+  let lastErr;
+  for (const url of urls) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (res.status === 429) throw new Error('Rate limit exceeded');
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+
+      const data = await res.json();
+      if (!data || data.length === 0) throw new Error('No data available');
+
+      state.chartCache[cacheKey] = { data, timestamp: now };
+      return data;
+    } catch (err) {
+      lastErr = err;
+      console.warn('fetchCoinOHLC attempt failed:', err.message);
+    }
+  }
+
+  console.error('fetchCoinOHLC all attempts failed:', lastErr);
+  throw lastErr;
 }
 
 async function fetchExchangeRates() {
@@ -687,7 +728,7 @@ function toggleWatchlist(coinId, btnEl) {
     }
     showToast('Removed from watchlist', 'info');
   }
-  saveWatchlist();
+  window.saveWatchlist();
   if (state.currentPage === 'watchlist') renderWatchlist();
 }
 
@@ -809,7 +850,7 @@ function addPortfolioTransaction() {
   };
 
   state.portfolio.push(tx);
-  savePortfolio();
+  window.savePortfolio();
   renderPortfolio();
   renderPortfolioChart();
   showToast(`${type === 'buy' ? '🟢 Bought' : '🔴 Sold'} ${amount} ${tx.coinSymbol} @ ${formatPrice(price)}`, 'success');
@@ -823,7 +864,7 @@ function addPortfolioTransaction() {
 
 function removeTransaction(txId) {
   state.portfolio = state.portfolio.filter(t => t.id !== txId);
-  savePortfolio();
+  window.savePortfolio();
   renderPortfolio();
   renderPortfolioChart();
   showToast('Transaction removed.', 'info');
@@ -988,7 +1029,7 @@ function addAlert() {
   };
 
   state.alerts.push(alert);
-  saveAlerts();
+  window.saveAlerts();
   renderAlerts();
   updateAlertBadge();
   showToast(`🔔 Alert set for ${coin?.name} ${condition} $${price}`, 'success');
@@ -1000,7 +1041,7 @@ function addAlert() {
 
 function removeAlert(alertId) {
   state.alerts = state.alerts.filter(a => a.id !== alertId);
-  saveAlerts();
+  window.saveAlerts();
   renderAlerts();
   updateAlertBadge();
 }
@@ -1060,7 +1101,7 @@ function checkAlerts() {
   });
 
   if (triggered > 0) {
-    saveAlerts();
+    window.saveAlerts();
     updateAlertBadge();
     if (state.currentPage === 'alerts') renderAlerts();
   }
@@ -1163,9 +1204,52 @@ async function openCoinModal(coinId) {
 
 function closeCoinModal(e) {
   if (e && e.target !== document.getElementById('coin-modal')) return;
+  // Exit fullscreen first if active
+  const wrap = document.getElementById('modal-chart-wrap');
+  if (wrap && wrap.classList.contains('fullscreen')) {
+    wrap.classList.remove('fullscreen');
+    document.body.style.overflow = '';
+  }
   document.getElementById('coin-modal').classList.remove('active');
   if (state.coinDetailChart) { state.coinDetailChart.destroy(); state.coinDetailChart = null; }
 }
+
+function toggleChartFullscreen() {
+  const wrap = document.getElementById('modal-chart-wrap');
+  if (!wrap) return;
+  const isNowFullscreen = wrap.classList.toggle('fullscreen');
+  document.body.style.overflow = isNowFullscreen ? 'hidden' : '';
+
+  // Give the DOM one frame to settle, then resize the chart
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      const container = document.getElementById('coin-detail-chart');
+      if (state.coinDetailChart && container) {
+        state.coinDetailChart.applyOptions({
+          width:  container.clientWidth  || (isNowFullscreen ? window.innerWidth  - 64 : 600),
+          height: container.clientHeight || (isNowFullscreen ? window.innerHeight - 96 : 320),
+        });
+        state.coinDetailChart.timeScale().fitContent();
+      }
+    }, 60);
+  });
+}
+
+// Escape key: exit fullscreen or close modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const wrap = document.getElementById('modal-chart-wrap');
+    if (wrap && wrap.classList.contains('fullscreen')) {
+      toggleChartFullscreen();
+    } else if (document.getElementById('coin-modal')?.classList.contains('active')) {
+      closeCoinModal();
+    }
+  }
+  // 'F' key toggles fullscreen when modal is open
+  if ((e.key === 'f' || e.key === 'F') && document.getElementById('coin-modal')?.classList.contains('active')) {
+    toggleChartFullscreen();
+  }
+});
 
 async function loadCoinChart(days) {
   // Update active time button
@@ -1188,8 +1272,19 @@ async function loadCoinChart(days) {
       throw new Error('Charting library not loaded. Please check your internet connection.');
     }
 
-    const data = await fetchCoinOHLC(coin.id, days);
-    
+    // Try OHLC first; fall back to market_chart if it fails (rate limit / API error)
+    let rawData;
+    let isOHLC = true;
+    try {
+      rawData = await fetchCoinOHLC(coin.id, days);
+    } catch (ohlcErr) {
+      console.warn(`OHLC fetch failed (${ohlcErr.message}), falling back to market_chart…`);
+      isOHLC = false;
+      const marketData = await fetchCoinHistory(coin.id, days);
+      // market_chart returns { prices: [[timestamp, price], ...], ... }
+      rawData = marketData.prices || marketData;
+    }
+
     // Small delay to ensure container has dimensions (important for modals)
     await new Promise(r => requestAnimationFrame(r));
     
@@ -1254,10 +1349,15 @@ async function loadCoinChart(days) {
       lastValueVisible: true,
     });
 
-    const formattedData = data.map(d => ({
-      time: d[0] / 1000,
-      value: d[4] // Use 'close' price for the line
-    }));
+    // OHLC format: [timestamp, open, high, low, close]  → use index 4 (close)
+    // market_chart format: [timestamp, price]           → use index 1
+    const formattedData = rawData
+      .map(d => ({
+        time: Math.floor(d[0] / 1000),
+        value: isOHLC ? d[4] : d[1],
+      }))
+      // Remove duplicate timestamps (LightweightCharts requires strictly ascending times)
+      .filter((d, i, arr) => i === 0 || d.time > arr[i - 1].time);
 
     areaSeries.setData(formattedData);
     chart.timeScale().fitContent();
@@ -1960,7 +2060,7 @@ async function executeExchangeOrder() {
     showToast(`Successfully sold ${amount} ${coin.symbol.toUpperCase()}`, 'success');
   }
 
-  saveExData();
+  window.saveExData();
   updateExchangeBalanceDisplay();
   renderExchangeHistory();
   document.getElementById('ex-amount').value = '';
