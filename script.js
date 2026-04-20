@@ -53,6 +53,7 @@ var state = {
   exTrades: [],               // List of trade objects
   exChart: null,              // Exchange chart instance
   chartCache: {},             // { "coinId-days": { data, timestamp } }
+  chartResizeObserver: null,  // Active ResizeObserver for coin detail chart
   isRateLimited: false,       // Track active rate limit
   rateLimitStartTime: 0,      // Timestamp of last 429 error
 };
@@ -1211,6 +1212,8 @@ function closeCoinModal(e) {
     document.body.style.overflow = '';
   }
   document.getElementById('coin-modal').classList.remove('active');
+  // Disconnect resize observer before destroying chart
+  if (state.chartResizeObserver) { state.chartResizeObserver.disconnect(); state.chartResizeObserver = null; }
   if (state.coinDetailChart) { state.coinDetailChart.destroy(); state.coinDetailChart = null; }
 }
 
@@ -1252,17 +1255,26 @@ document.addEventListener('keydown', (e) => {
 });
 
 async function loadCoinChart(days) {
-  // Update active time button
-  document.querySelectorAll('.time-btn').forEach(b => {
-    b.classList.toggle('active', b.textContent.replace('D','') === days || (days === '365' && b.textContent === '1Y'));
-  });
+  // Update active time button — scoped to modal only to avoid touching exchange chart buttons
+  const modalWrap = document.getElementById('modal-chart-wrap');
+  if (modalWrap) {
+    modalWrap.querySelectorAll('.time-btn').forEach(b => {
+      b.classList.toggle('active', b.textContent.replace('D','') === days || (days === '365' && b.textContent === '1Y'));
+    });
+  }
 
   const coin = state.currentModalCoin;
   if (!coin) return;
 
   const container = document.getElementById('coin-detail-chart');
-  
-  // Show loading & remove existing chart
+
+  // Disconnect old ResizeObserver BEFORE removing chart to prevent stale callbacks
+  if (state.chartResizeObserver) {
+    state.chartResizeObserver.disconnect();
+    state.chartResizeObserver = null;
+  }
+
+  // Remove existing chart instance
   if (state.coinDetailChart) { state.coinDetailChart.remove(); state.coinDetailChart = null; }
   container.innerHTML = '<div class="loading-spinner" style="margin: auto; width: 40px; height: 40px; border: 4px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>';
 
@@ -1362,14 +1374,16 @@ async function loadCoinChart(days) {
     areaSeries.setData(formattedData);
     chart.timeScale().fitContent();
 
-    new ResizeObserver(entries => {
+    const ro = new ResizeObserver(entries => {
       if (entries.length === 0 || entries[0].target !== container) return;
       if (!state.coinDetailChart) return;
       const newRect = entries[0].contentRect;
       if (newRect.width > 0) {
         chart.applyOptions({ width: newRect.width, height: newRect.height });
       }
-    }).observe(container);
+    });
+    ro.observe(container);
+    state.chartResizeObserver = ro;
 
   } catch (err) {
     console.error('Chart load error:', err);
