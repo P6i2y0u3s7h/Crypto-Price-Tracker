@@ -734,6 +734,57 @@
       <div class="toast-container" id="toast-container"></div>
 
     </main>
+
+    <!-- MOBILE BOTTOM NAV -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav" aria-label="Mobile Navigation">
+      <button class="mbn-item active" id="mbn-dashboard" onclick="navigateTo('dashboard')">
+        <span class="mbn-icon">📊</span>
+        <span class="mbn-label">Market</span>
+      </button>
+      <button class="mbn-item" id="mbn-watchlist" onclick="navigateTo('watchlist')">
+        <span class="mbn-icon">⭐</span>
+        <span class="mbn-label">Watch</span>
+      </button>
+      <button class="mbn-item" id="mbn-portfolio" onclick="navigateTo('portfolio')">
+        <span class="mbn-icon">💼</span>
+        <span class="mbn-label">Portfolio</span>
+      </button>
+      <button class="mbn-item" id="mbn-alerts" onclick="navigateTo('alerts')">
+        <span class="mbn-icon">🔔</span>
+        <span class="mbn-label">Alerts</span>
+      </button>
+      <button class="mbn-item" id="mbn-more" onclick="toggleMobileMoreMenu()">
+        <span class="mbn-icon" style="font-size:1.5rem;letter-spacing:-2px;line-height:1">···</span>
+        <span class="mbn-label">More</span>
+      </button>
+    </nav>
+
+    <!-- MOBILE MORE DRAWER -->
+    <div class="mbn-drawer-overlay" id="mbn-drawer-overlay" onclick="closeMobileMoreMenu()"></div>
+    <div class="mbn-more-drawer" id="mbn-more-drawer">
+      <div class="mbn-drawer-handle"></div>
+      <div class="mbn-drawer-grid">
+        <button class="mbn-drawer-item" onclick="navigateTo('exchange'); closeMobileMoreMenu()">
+          <span class="mbn-icon">🔄</span>Exchange
+        </button>
+        <button class="mbn-drawer-item" onclick="navigateTo('news'); closeMobileMoreMenu()">
+          <span class="mbn-icon">📰</span>News
+        </button>
+        <button class="mbn-drawer-item" onclick="navigateTo('chatbot'); closeMobileMoreMenu()">
+          <span class="mbn-icon">🤖</span>AI Chat
+        </button>
+        <button class="mbn-drawer-item" onclick="toggleDarkMode(); closeMobileMoreMenu()">
+          <span class="mbn-icon">🌙</span>Theme
+        </button>
+        <button class="mbn-drawer-item" onclick="refreshData(); closeMobileMoreMenu()">
+          <span class="mbn-icon">🔄</span>Refresh
+        </button>
+        <button class="mbn-drawer-item" onclick="(typeof handleFirebaseLogout === 'function' ? handleFirebaseLogout() : handleLogout()); closeMobileMoreMenu()">
+          <span class="mbn-icon">⏻</span>Logout
+        </button>
+      </div>
+    </div>
+
   </div>
 
   <!-- Firebase Auth (handles login / signup / logout) -->

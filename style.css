@@ -788,7 +788,7 @@ body {
 .chart-wrap.fullscreen {
   position: fixed !important;
   top: 0 !important;
-  left: 260px !important;
+  left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
   z-index: 9999 !important;
@@ -796,6 +796,15 @@ body {
   padding: 2rem;
   display: flex;
   flex-direction: column;
+}
+
+/* Hide sidebar when chart is fullscreen */
+body:has(.chart-wrap.fullscreen) .sidebar {
+  display: none !important;
+}
+/* Hide modal backdrop/content behind fullscreen chart */
+body:has(.chart-wrap.fullscreen) .modal-overlay {
+  z-index: 100 !important;
 }
 .chart-wrap .chart-time-filters { margin-bottom: 0.6rem; flex-shrink: 0; }
 .chart-wrap.fullscreen .chart-time-filters {
@@ -1030,7 +1039,7 @@ body {
    COIN DETAIL MODAL
    ============================================= */
 .modal-overlay {
-  display: none; position: fixed; inset: 0; z-index: 500;
+  display: none; position: fixed; inset: 0; z-index: 2000;
   background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
   align-items: center; justify-content: center;
   padding: 1.5rem;
@@ -1622,4 +1631,390 @@ body {
   .mini-conv-row { flex-direction: column; }
   .mini-conv-equals { display: none; }
   .mini-conv-result { width: 100%; }
+}
+/* =============================================
+   MOBILE BOTTOM NAVIGATION
+   ============================================= */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 500;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  padding: 0.4rem 0;
+  padding-bottom: calc(0.4rem + env(safe-area-inset-bottom, 0px));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  justify-content: space-around;
+  align-items: stretch;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+}
+
+.mbn-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18rem;
+  padding: 0.45rem 0.5rem;
+  flex: 1;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: color 0.2s, transform 0.15s;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+  border: none; background: none;
+}
+
+.mbn-item.active { color: var(--accent); }
+
+.mbn-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 25%; right: 25%;
+  height: 2px;
+  background: var(--accent-gradient);
+  border-radius: 0 0 4px 4px;
+}
+
+.mbn-item:active { transform: scale(0.92); }
+
+.mbn-icon { font-size: 1.25rem; line-height: 1; }
+.mbn-label { font-size: 0.6rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* More menu drawer */
+.mbn-more-drawer {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 490;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 1rem;
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.35);
+  animation: slideUp 0.25s ease;
+}
+.mbn-more-drawer.open { display: block; }
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.mbn-drawer-handle {
+  width: 40px; height: 4px; border-radius: 2px;
+  background: var(--border); margin: 0 auto 1rem;
+}
+.mbn-drawer-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;
+}
+.mbn-drawer-item {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0.35rem; padding: 0.85rem 0.5rem;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 14px; cursor: pointer;
+  font-size: 0.78rem; font-weight: 600; color: var(--text-secondary);
+  transition: all 0.2s; -webkit-tap-highlight-color: transparent;
+  border: none;
+}
+.mbn-drawer-item:active, .mbn-drawer-item:hover {
+  background: rgba(108,99,255,0.08); color: var(--accent);
+}
+.mbn-drawer-item .mbn-icon { font-size: 1.5rem; }
+.mbn-drawer-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 480;
+  backdrop-filter: blur(4px);
+}
+.mbn-drawer-overlay.open { display: block; }
+
+
+/* =============================================
+   COMPREHENSIVE MOBILE RESPONSIVE STYLES
+   ============================================= */
+
+/* ── 992px: Tablet – Sidebar becomes a drawer ── */
+@media (max-width: 992px) {
+  .mobile-bottom-nav { display: flex; }
+
+  /* Body padding for bottom nav */
+  #app .main-content { padding-bottom: 70px; }
+
+  /* Topbar: tighter */
+  .topbar { padding: 0.7rem 1rem; gap: 0.6rem; }
+  .page-title { font-size: 1rem; }
+
+  /* Show hamburger */
+  .hamburger { display: flex; }
+
+  /* Main content full width */
+  .main-content { margin-left: 0 !important; }
+
+  /* Sidebar: high z-index, overlay mode */
+  .sidebar { z-index: 600; }
+  .sidebar-overlay { z-index: 590; }
+
+  /* Search input compress */
+  .search-input { width: 130px; }
+
+  /* Fullscreen chart */
+  .chart-wrap.fullscreen { left: 0 !important; }
+
+  /* Exchange layout */
+  .exchange-layout { grid-template-columns: 1fr; }
+  .exchange-history { max-height: none; }
+}
+
+/* ── 768px: Mobile phones ── */
+@media (max-width: 768px) {
+
+  /* ---- Global page spacing ---- */
+  .page { padding: 0.85rem; gap: 0.85rem; }
+  .section-card { padding: 1rem; border-radius: 16px; }
+
+  /* ---- Topbar: compact ---- */
+  .topbar { padding: 0.65rem 0.85rem; gap: 0.5rem; }
+  .topbar-actions { gap: 0.4rem; }
+  .search-input { width: 100px; font-size: 0.82rem; }
+  .last-updated { display: none; }
+
+  /* Only show currency + 2 icon buttons on mobile */
+  #global-currency { font-size: 0.78rem; padding: 0.35rem 0.5rem; }
+  .btn-icon { width: 32px; height: 32px; font-size: 0.9rem; }
+
+  /* ---- Stats grid: 2 col ---- */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.65rem;
+  }
+  .stat-card { padding: 1rem 1rem; border-radius: 14px; }
+  .stat-value { font-size: 1.2rem; }
+
+  /* ---- Section header: stack on small screens ---- */
+  .section-header { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .filter-row { width: 100%; }
+  .select-control { font-size: 0.8rem; padding: 0.4rem 0.6rem; }
+
+  /* ---- Coins table: horizontal scroll with touch ---- */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -1rem;
+    padding: 0 1rem;
+    /* Subtle scroll shadow on right */
+    background:
+      linear-gradient(to right, var(--bg-card) 0%, transparent 2%) left,
+      linear-gradient(to left, var(--bg-card) 0%, transparent 2%) right,
+      radial-gradient(farthest-side at 0 50%, rgba(0,0,0,0.15), transparent) left,
+      radial-gradient(farthest-side at 100% 50%, rgba(0,0,0,0.15), transparent) right;
+    background-repeat: no-repeat;
+    background-size: 40px 100%, 40px 100%, 14px 100%, 14px 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+  .coins-table { min-width: 650px; font-size: 0.82rem; }
+  .coins-table th { padding: 0.6rem 0.75rem; font-size: 0.7rem; }
+  .coins-table td { padding: 0.7rem 0.75rem; }
+  /* Hide mini chart and market cap on mobile to save space */
+  .coins-table th:nth-child(5),
+  .coins-table td:nth-child(5),
+  .coins-table th:nth-child(7),
+  .coins-table td:nth-child(7) { display: none; }
+  .coins-table { min-width: 480px; }
+
+  /* ---- Action buttons in table: compact ---- */
+  .action-btns { gap: 0.35rem; }
+  .btn-chart-action { padding: 0.4rem 0.7rem; font-size: 0.78rem; }
+  .btn-sm { padding: 0.3rem 0.5rem; font-size: 0.75rem; }
+
+  /* ---- Watchlist: 2 col grid on mobile ---- */
+  .coins-grid { grid-template-columns: repeat(2, 1fr); gap: 0.65rem; }
+  .watch-card { padding: 1rem; }
+  .watch-price { font-size: 1.1rem; }
+  .watch-coin-name { font-size: 0.9rem; }
+
+  /* ---- Portfolio: single column ---- */
+  .portfolio-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .portfolio-summary { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+  .summary-value { font-size: 1rem; }
+  .form-row { flex-direction: column; gap: 0.6rem; }
+  .portfolio-form .form-row { flex-direction: row; flex-wrap: wrap; }
+  .portfolio-form .form-group { flex: 1; min-width: 120px; }
+
+  /* ---- Transaction items: compact ---- */
+  .transaction-item { padding: 0.7rem 0.85rem; gap: 0.6rem; }
+  .tx-total { font-size: 0.85rem; }
+
+  /* ---- Alerts: stack badge under name ---- */
+  .alert-item { flex-wrap: wrap; gap: 0.5rem; padding: 0.85rem 1rem; }
+  .alert-coin-info { min-width: 0; flex: 1; }
+  .alert-status { font-size: 0.68rem; }
+
+  /* ---- Converter ---- */
+  .converter-grid { flex-direction: column; gap: 0.75rem; }
+  .converter-swap { justify-content: center; }
+  .btn-swap { transform: rotate(90deg); }
+  .result-amount { font-size: 2rem; }
+  .converter-result-wrap { padding: 1.1rem; }
+
+  /* ---- Rate grid ---- */
+  .rate-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 0.5rem; }
+
+  /* ---- News: single column ---- */
+  .news-grid { grid-template-columns: 1fr; gap: 0.85rem; }
+  .news-img { height: 140px; }
+  .filter-row .filter-btn { font-size: 0.78rem; padding: 0.3rem 0.7rem; }
+
+  /* ---- Analysis ---- */
+  .analysis-layout { grid-template-columns: 1fr; }
+  .analysis-controls { max-width: none; }
+  .indicators-grid { grid-template-columns: repeat(2, 1fr); }
+
+  /* ---- Fear & Greed ---- */
+  .fear-greed-meter { width: 160px; height: 80px; }
+  .fg-arc { width: 160px; height: 160px; }
+  .fg-mask { width: 112px; height: 112px; left: 24px; }
+  .fg-needle { height: 64px; }
+  .fg-value { font-size: 2rem; }
+
+  /* ---- Coin detail modal: full-width bottom sheet ---- */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    border-radius: 20px 20px 0 0;
+    max-width: 100%;
+    max-height: 92vh;
+    padding: 1.25rem;
+    padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+  }
+  .modal-header img { width: 38px; height: 38px; }
+  .modal-coin-name { font-size: 1.1rem; }
+  .modal-price { font-size: 0.95rem; }
+  .modal-stats { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+  .modal-chart { min-height: 200px; }
+  .time-btn { padding: 0.3rem 0.6rem; font-size: 0.78rem; }
+
+  /* ---- Exchange: single column ---- */
+  .exchange-layout { grid-template-columns: 1fr; gap: 1rem; }
+  .exchange-pair-selector { flex-direction: column; gap: 0.6rem; }
+  .ex-live-price { min-width: auto; text-align: left; }
+  .exchange-history { max-height: 300px; }
+
+  /* ---- Chatbot ---- */
+  .chatbot-layout { grid-template-columns: 1fr; height: auto; gap: 0.85rem; }
+  .chat-main { height: calc(100svh - 230px); min-height: 360px; }
+  .chat-sidebar { display: none; } /* hidden on mobile by default */
+  .chat-header { padding: 0.85rem 1rem; }
+  .chat-messages { padding: 0.85rem 1rem; }
+  .quick-prompts { padding: 0.6rem 1rem; gap: 0.35rem; }
+  .quick-chip { font-size: 0.72rem; padding: 0.28rem 0.65rem; }
+  .chat-input-bar { padding: 0.65rem 1rem; }
+  .chat-input { font-size: 0.88rem; padding: 0.6rem 1rem; }
+
+  /* ---- Mini converter ---- */
+  .mini-conv-row { flex-direction: column; gap: 0.6rem; }
+  .mini-conv-equals { display: none; }
+  .mini-conv-result { width: 100%; }
+
+  /* ---- Toast: bottom-left + wider on mobile ---- */
+  .toast-container {
+    bottom: calc(70px + 0.75rem);
+    right: 0.75rem;
+    left: 0.75rem;
+    align-items: stretch;
+  }
+  .toast { max-width: 100%; }
+
+  /* ---- Buttons: touch-friendly minimum height ---- */
+  .btn-primary { padding: 0.7rem 1.25rem; min-height: 44px; }
+  .btn-exchange { min-height: 48px; font-size: 0.95rem; }
+
+  /* ---- Misc ---- */
+  .rate-table-wrap { overflow-x: auto; }
+  .section-header h2 { font-size: 1rem; }
+}
+
+/* ── 480px: Small phones ── */
+@media (max-width: 480px) {
+  .page { padding: 0.65rem; gap: 0.65rem; }
+  .section-card { padding: 0.85rem; border-radius: 14px; }
+
+  /* Topbar: hide search on very small screens */
+  #global-search-wrap { display: none !important; }
+  .topbar-actions { gap: 0.3rem; }
+  #global-currency { max-width: 70px; }
+
+  /* Stats: 2 col even tighter */
+  .stat-card { padding: 0.85rem; }
+  .stat-value { font-size: 1.05rem; }
+  .stat-label { font-size: 0.68rem; }
+
+  /* Watchlist: 1 col on tiny screens */
+  .coins-grid { grid-template-columns: 1fr; }
+
+  /* Portfolio summary: full width each */
+  .portfolio-summary { grid-template-columns: 1fr 1fr; }
+
+  /* Modal: full height */
+  .modal { max-height: 96vh; border-radius: 16px 16px 0 0; }
+
+  /* Chart time buttons: smaller */
+  .chart-time-filters { gap: 0.25rem; }
+  .time-btn { padding: 0.25rem 0.5rem; font-size: 0.72rem; }
+
+  /* Bottom nav labels: show only icons on very small */
+  .mbn-label { display: none; }
+  .mbn-icon { font-size: 1.4rem; }
+  .mbn-item { padding: 0.6rem 0.5rem; }
+
+  /* Exchange order preview */
+  .ex-preview-row { font-size: 0.78rem; }
+  .ex-preview-row strong { font-size: 0.82rem; }
+
+  /* Alert items: wrap */
+  .alert-item { padding: 0.75rem; }
+  .alert-coin-name { font-size: 0.85rem; }
+
+  /* Transaction items */
+  .transaction-item { flex-wrap: wrap; }
+}
+
+/* ── Landscape mobile (short height) ── */
+@media (max-width: 900px) and (max-height: 500px) {
+  .chat-main { height: 60svh; min-height: 280px; }
+  .modal { max-height: 95vh; }
+  .page { padding: 0.5rem; }
+}
+
+/* ── Safe area for notched phones ── */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .mobile-bottom-nav {
+    padding-bottom: calc(0.4rem + env(safe-area-inset-bottom));
+  }
+  #app .main-content {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Touch: larger tap targets ── */
+@media (hover: none) and (pointer: coarse) {
+  .nav-item { padding: 0.9rem 1.25rem; }
+  .btn-sm { min-height: 36px; }
+  .select-control { min-height: 38px; }
+  .form-input { min-height: 44px; padding: 0.75rem 0.85rem; }
+  .time-btn { min-height: 34px; }
+  .coins-table td { padding: 0.95rem 0.75rem; }
+  .quick-chip { min-height: 34px; }
+  .filter-btn { min-height: 36px; }
+  .ex-tab { min-height: 44px; }
+}
+
+/* ── Prevent horizontal overflow globally on mobile ── */
+@media (max-width: 768px) {
+  .app, .main-content { overflow-x: hidden; }
+  .page > * { max-width: 100%; }
 }

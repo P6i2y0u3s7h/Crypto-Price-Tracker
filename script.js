@@ -285,6 +285,18 @@ function navigateTo(page) {
 
   state.currentPage = page;
 
+  // Sync mobile bottom nav active state
+  const mbnPages = ['dashboard', 'watchlist', 'portfolio', 'alerts'];
+  document.querySelectorAll('.mbn-item').forEach(el => el.classList.remove('active'));
+  if (mbnPages.includes(page)) {
+    const mbnEl = document.getElementById('mbn-' + page);
+    if (mbnEl) mbnEl.classList.add('active');
+  } else {
+    // For exchange/news/chatbot: highlight 'more' button
+    const mbnMore = document.getElementById('mbn-more');
+    if (mbnMore) mbnMore.classList.add('active');
+  }
+
   // Close sidebar on mobile
   closeSidebarMobile();
 
@@ -328,6 +340,16 @@ function toggleSidebar() {
 function closeSidebarMobile() {
   document.getElementById('sidebar')?.classList.remove('open');
   document.getElementById('sidebar-overlay')?.classList.remove('active');
+}
+
+function toggleMobileMoreMenu() {
+  document.getElementById('mbn-more-drawer')?.classList.toggle('open');
+  document.getElementById('mbn-drawer-overlay')?.classList.toggle('open');
+}
+
+function closeMobileMoreMenu() {
+  document.getElementById('mbn-more-drawer')?.classList.remove('open');
+  document.getElementById('mbn-drawer-overlay')?.classList.remove('open');
 }
 
 // =============================================
@@ -602,7 +624,7 @@ function renderCoinsTable(coins) {
               ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>' 
               : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>'}
           </button>
-          <button class="btn-sm btn-chart-action" onclick="openCoinModal('${coin.id}')">
+          <button class="btn-sm btn-chart-action" onclick="openCoinModal('${coin.id}', true)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="m19 9-5 5-4-4-3 3"></path></svg>
             <span>Chart</span>
           </button>
@@ -1161,7 +1183,7 @@ function playAlertSound() {
 // =============================================
 // COIN DETAIL MODAL
 // =============================================
-async function openCoinModal(coinId) {
+async function openCoinModal(coinId, chartOnly = false) {
   const coin = state.allCoins.find(c => c.id === coinId);
   if (!coin) return;
 
@@ -1201,6 +1223,10 @@ async function openCoinModal(coinId) {
 
   modal.classList.add('active');
   await loadCoinChart('1');
+  if (chartOnly) {
+    const wrap = document.getElementById('modal-chart-wrap');
+    if (wrap && !wrap.classList.contains('fullscreen')) toggleChartFullscreen();
+  }
 }
 
 function closeCoinModal(e) {
@@ -1284,17 +1310,25 @@ async function loadCoinChart(days) {
       throw new Error('Charting library not loaded. Please check your internet connection.');
     }
 
-    // Try OHLC first; fall back to market_chart if it fails (rate limit / API error)
+    // Try market_chart first (free API tier); OHLC requires paid key so skip it.
+    // Final fallback: sparkline data already bundled in the coin object (7d only).
     let rawData;
-    let isOHLC = true;
+    let isOHLC = false;
+
     try {
-      rawData = await fetchCoinOHLC(coin.id, days);
-    } catch (ohlcErr) {
-      console.warn(`OHLC fetch failed (${ohlcErr.message}), falling back to market_chart…`);
-      isOHLC = false;
       const marketData = await fetchCoinHistory(coin.id, days);
-      // market_chart returns { prices: [[timestamp, price], ...], ... }
       rawData = marketData.prices || marketData;
+      if (!rawData || rawData.length === 0) throw new Error('Empty market_chart response');
+    } catch (apiErr) {
+      console.warn(`market_chart fetch failed (${apiErr.message}), falling back to sparkline…`);
+      // Use the 7-day sparkline data already loaded with coin list
+      const spark = coin.sparkline_in_7d?.price;
+      if (!spark || spark.length < 2) throw new Error('No chart data available for this coin.');
+      // Convert sparkline array to [[timestamp, price], ...] format
+      const now = Date.now();
+      const step = (7 * 24 * 60 * 60 * 1000) / spark.length;
+      rawData = spark.map((price, i) => [now - (spark.length - 1 - i) * step, price]);
+      isOHLC = false;
     }
 
     // Small delay to ensure container has dimensions (important for modals)
@@ -1390,13 +1424,15 @@ async function loadCoinChart(days) {
     let msg = 'Failed to load chart data.';
     
     if (err.message === 'Rate limit exceeded') {
-      msg = 'API Rate limit reached. Please wait 60s.';
-    } else if (err.message === 'No data available') {
-      msg = 'No candlestick data found for this coin.';
+      msg = 'API rate limit reached. Please wait 60 seconds and retry.';
+    } else if (err.message === 'No data available' || err.message.includes('No chart data')) {
+      msg = 'No chart data available for this coin.';
     } else if (err.message.includes('API error')) {
-      msg = 'CoinGecko API is currently unavailable.';
+      msg = 'CoinGecko API is currently unavailable. Try again shortly.';
     } else if (err.message.includes('Charting library')) {
       msg = err.message;
+    } else if (err.message.includes('network') || err.message.includes('fetch')) {
+      msg = 'Network error — check your internet connection.';
     }
 
     container.innerHTML = `<div style="display:flex;flex-direction:column;height:100%;align-items:center;justify-content:center;color:var(--loss);text-align:center;padding:1rem;gap:1rem;">
