@@ -285,18 +285,6 @@ function navigateTo(page) {
 
   state.currentPage = page;
 
-  // Sync mobile bottom nav active state
-  const mbnPages = ['dashboard', 'watchlist', 'portfolio', 'alerts'];
-  document.querySelectorAll('.mbn-item').forEach(el => el.classList.remove('active'));
-  if (mbnPages.includes(page)) {
-    const mbnEl = document.getElementById('mbn-' + page);
-    if (mbnEl) mbnEl.classList.add('active');
-  } else {
-    // For exchange/news/chatbot: highlight 'more' button
-    const mbnMore = document.getElementById('mbn-more');
-    if (mbnMore) mbnMore.classList.add('active');
-  }
-
   // Close sidebar on mobile
   closeSidebarMobile();
 
@@ -342,15 +330,6 @@ function closeSidebarMobile() {
   document.getElementById('sidebar-overlay')?.classList.remove('active');
 }
 
-function toggleMobileMoreMenu() {
-  document.getElementById('mbn-more-drawer')?.classList.toggle('open');
-  document.getElementById('mbn-drawer-overlay')?.classList.toggle('open');
-}
-
-function closeMobileMoreMenu() {
-  document.getElementById('mbn-more-drawer')?.classList.remove('open');
-  document.getElementById('mbn-drawer-overlay')?.classList.remove('open');
-}
 
 // =============================================
 // THEME
@@ -1502,15 +1481,24 @@ function renderRateGrid() {
 // NEWS
 // =============================================
 const NEWS_DATA = [
-  { id:1, category:'bitcoin', tag:'Bitcoin', tagColor:'#f59e0b', headline:'Bitcoin Surpasses $100K Milestone, Setting New All-Time High Record', summary:'The largest cryptocurrency breaks the psychological barrier as institutional demand surges.', source:'CryptoTimes', time:'2h ago', img:'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=400&q=70' },
-  { id:2, category:'ethereum', tag:'Ethereum', tagColor:'#6c63ff', headline:'Ethereum Shanghai Upgrade Unlocks $30B in Staked ETH for Withdrawal', summary:'Validators can now unstake their ETH following the highly anticipated protocol upgrade.', source:'DeFi Pulse', time:'4h ago', img:'https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=400&q=70' },
-  { id:3, category:'defi', tag:'DeFi', tagColor:'#22d3a0', headline:'Total Value Locked in DeFi Protocols Reaches $200B as Yield Farming Returns', summary:'Decentralized finance sees a massive resurgence with new protocols offering high APY.', source:'DeFi Insider', time:'6h ago', img:'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&q=70' },
-  { id:4, category:'nft', tag:'NFT', tagColor:'#f093fb', headline:'Major Gaming Studio Launches NFT Marketplace with 10M User Base', summary:'The move signals mainstream adoption of NFTs in the gaming industry worldwide.', source:'NFT World', time:'8h ago', img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70' },
-  { id:5, category:'regulation', tag:'Regulation', tagColor:'#ff5b6e', headline:'SEC Approves Next Batch of Spot Bitcoin ETFs from Major Asset Managers', summary:'The landmark decision opens the door for billions in new institutional investment flows.', source:'Reuters Crypto', time:'10h ago', img:'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&q=70' },
-  { id:6, category:'bitcoin', tag:'Bitcoin', tagColor:'#f59e0b', headline:'MicroStrategy Adds 10,000 BTC to Treasury, Now Holds Over 200,000 BTC', summary:'Michael Saylor\'s firm continues its aggressive Bitcoin accumulation strategy.', source:'Forbes Crypto', time:'12h ago', img:'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&q=70' },
-  { id:7, category:'ethereum', tag:'Ethereum', tagColor:'#6c63ff', headline:'Ethereum Layer-2 Networks Process More Transactions Than Ethereum Mainnet', summary:'Optimistic rollups and ZK-rollups now handle the majority of Ethereum ecosystem activity.', source:'L2Beat', time:'1d ago', img:'https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=400&q=70' },
-  { id:8, category:'defi', tag:'DeFi', tagColor:'#22d3a0', headline:'Uniswap v4 Launches with Hooks Feature, Reshaping DEX Landscape Forever', summary:'The latest version of the popular DEX introduces customizable pool logic through hooks.', source:'The Block', time:'1d ago', img:'https://images.unsplash.com/photo-1580048915913-4f8f5cb481c4?w=400&q=70' },
-  { id:9, category:'regulation', tag:'Regulation', tagColor:'#ff5b6e', headline:'EU MiCA Regulation Takes Full Effect, Bringing Clarity to Crypto Industry', summary:'Europe\'s comprehensive crypto regulation framework becomes fully enforceable across member states.', source:'CoinDesk', time:'2d ago', img:'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&q=70' },
+  { id:1, category:'bitcoin', tag:'Bitcoin', tagColor:'#f59e0b', headline:'Bitcoin Surpasses $100K Milestone, Setting New All-Time High Record', summary:'The largest cryptocurrency breaks the psychological barrier as institutional demand surges.', source:'CryptoTimes', time:'2h ago', img:'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=400&q=70',
+    body:`Bitcoin has officially crossed the $100,000 mark for the first time in history, setting a new all-time high that has sent shockwaves through both crypto and traditional finance markets.\n\nThe milestone was reached in the early hours of trading as institutional demand reached a fever pitch. Spot Bitcoin ETFs recorded their highest single-day inflows since launch, with over $2.1 billion flowing into vehicles from BlackRock, Fidelity, and ARK Invest combined.\n\nAnalysts attribute the surge to a confluence of factors: a weakening US dollar index, anticipation of the next Bitcoin halving event, and growing corporate treasury adoption. MicroStrategy's continued accumulation and rumours of sovereign wealth fund interest have further fuelled bullish sentiment.\n\n"This isn't just a psychological barrier — it's a structural shift in how global capital views Bitcoin," said prominent crypto strategist James Chen. "We're seeing institutional FOMO at a scale we've never witnessed before."\n\nRetail participation has also surged, with major exchanges reporting record new account sign-ups. On-chain data shows long-term holders are largely maintaining their positions, suggesting confidence in further upside.\n\nThe broader crypto market followed Bitcoin's lead, with the total market cap briefly touching $3.8 trillion. Ethereum, Solana, and BNB all posted double-digit gains in the 24-hour period.` },
+  { id:2, category:'ethereum', tag:'Ethereum', tagColor:'#6c63ff', headline:'Ethereum Shanghai Upgrade Unlocks $30B in Staked ETH for Withdrawal', summary:'Validators can now unstake their ETH following the highly anticipated protocol upgrade.', source:'DeFi Pulse', time:'4h ago', img:'https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=400&q=70',
+    body:`The Ethereum network successfully completed the Shanghai (Shapella) upgrade, enabling validator withdrawals for the first time since the Beacon Chain launched in December 2020. More than $30 billion worth of staked ETH is now eligible for withdrawal.\n\nThe upgrade, which was activated at epoch 194,048, introduces EIP-4895 — a mechanism that allows validators to exit the staking queue and reclaim their ETH plus accumulated rewards. Critically, withdrawals are processed in a queue to prevent a sudden supply shock.\n\nIn the first 24 hours post-upgrade, approximately 285,000 ETH worth of partial withdrawals (rewards only) were processed. Full validator exits have been slower, with the exit queue currently estimated at around 7–10 days.\n\nContrary to fears of a massive sell-off, ETH prices have remained stable and even ticked higher. Market observers note that many institutional stakers — who represent the majority of staked ETH — are long-term holders unlikely to liquidate immediately.\n\n"This upgrade actually removes a key uncertainty overhang," noted Ethereum Foundation researcher Danny Ryan. "Liquidity is now possible, which paradoxically makes more people willing to stake."\n\nLiquid staking protocols like Lido and Rocket Pool also saw their tokens rally as the upgrade demonstrated the maturity of Ethereum's staking ecosystem. Total staked ETH stands at roughly 18 million, representing about 15% of the circulating supply.` },
+  { id:3, category:'defi', tag:'DeFi', tagColor:'#22d3a0', headline:'Total Value Locked in DeFi Protocols Reaches $200B as Yield Farming Returns', summary:'Decentralized finance sees a massive resurgence with new protocols offering high APY.', source:'DeFi Insider', time:'6h ago', img:'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=400&q=70',
+    body:`Decentralized finance (DeFi) has roared back to life, with the total value locked (TVL) across all protocols surpassing $200 billion — a level not seen since the peak of the 2021 bull market.\n\nData from DeFiLlama shows the milestone was crossed as a new wave of yield farming opportunities emerged on both established chains like Ethereum and newer high-performance networks including Arbitrum, Base, and Solana.\n\nLeading the charge are several new lending and liquidity protocols offering APYs ranging from 15% to over 80% for early liquidity providers. Critics caution that high yields often come with elevated smart contract risk, but supporters argue that improved auditing practices and insurance protocols have materially reduced this risk.\n\nMaker (now Sky), Aave, and Compound continue to anchor the DeFi stack, while Pendle Finance has emerged as a standout for interest-rate trading, attracting over $4.5 billion in TVL alone.\n\n"We're seeing a more sophisticated DeFi user base this cycle," said Kain Warwick, co-founder of Synthetix. "People understand the risks better, and the tooling has improved dramatically. Real yield — not just token emissions — is what's drawing capital back in."\n\nCross-chain bridges have also seen renewed activity, with volume jumping 340% quarter-over-quarter as users move assets to chase the best yields across ecosystems. Security in this area remains a focal concern, with the industry pointing to improved bridge designs as a key development.` },
+  { id:4, category:'nft', tag:'NFT', tagColor:'#f093fb', headline:'Major Gaming Studio Launches NFT Marketplace with 10M User Base', summary:'The move signals mainstream adoption of NFTs in the gaming industry worldwide.', source:'NFT World', time:'8h ago', img:'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=70',
+    body:`In a landmark move for mainstream NFT adoption, Epic Games subsidiary Legendary Studios has launched an integrated NFT marketplace built directly into its flagship title, granting immediate access to a player base of over 10 million active users.\n\nThe marketplace, built on the Immutable zkEVM network, allows players to buy, sell, and trade in-game items as true digital assets they own. Unlike traditional gaming items locked to a single account, these NFTs can be transferred, listed on secondary markets, or used across partner games within the Legendary ecosystem.\n\nThe launch collection — 50,000 "Artifact" NFTs representing rare weapon skins and character cosmetics — sold out within 47 minutes, generating approximately $8.3 million in primary sales. Secondary trading volume in the first 12 hours topped $2.1 million.\n\n"We've always believed players should truly own their items," said CEO Marcus Henning at the launch event. "This isn't a gimmick — it's a fundamental shift in the player-publisher relationship."\n\nThe move has reignited debate about NFTs in gaming. Critics point to past failures and environmental concerns, though the Immutable zkEVM network operates with near-zero carbon footprint. Supporters argue that this represents the first AAA studio to implement NFTs with genuine utility rather than as a speculative add-on.\n\nShares of the studio's parent company rose 4.2% on the news, while IMX, Immutable's native token, surged 28% in 24 hours.` },
+  { id:5, category:'regulation', tag:'Regulation', tagColor:'#ff5b6e', headline:'SEC Approves Next Batch of Spot Bitcoin ETFs from Major Asset Managers', summary:'The landmark decision opens the door for billions in new institutional investment flows.', source:'Reuters Crypto', time:'10h ago', img:'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=400&q=70',
+    body:`The U.S. Securities and Exchange Commission has approved a second wave of spot Bitcoin exchange-traded funds, greenlighting applications from Invesco, WisdomTree, and Franklin Templeton — bringing the total number of approved spot Bitcoin ETFs to eleven.\n\nThe approvals follow the watershed January 2024 decision that first allowed spot Bitcoin ETFs in the United States, a move that unlocked tens of billions in institutional inflows. This latest batch is expected to attract an additional $15–20 billion in the first six months, according to projections from JPMorgan's digital assets desk.\n\nEach of the newly approved funds offers a distinct fee structure, with expense ratios ranging from 0.19% to 0.39%. Franklin Templeton's product notably includes a proof-of-reserves feature, allowing investors to verify on-chain that the fund holds the Bitcoin it claims.\n\n"Competition is healthy for the market," said SEC Chair Gary Gensler in a statement, marking a notable softening in tone compared to the agency's historically adversarial stance toward crypto products. "These products meet the investor protection standards we require."\n\nCrypto advocates welcomed the news, though some expressed frustration that spot Ethereum ETFs remain under review. Ethereum futures ETFs have been available since late 2023, but a spot product has faced repeated delays amid questions about ETH's regulatory classification.\n\nBitcoin responded positively to the announcement, adding 3.8% within the hour of the news breaking on major financial wires.` },
+  { id:6, category:'bitcoin', tag:'Bitcoin', tagColor:'#f59e0b', headline:'MicroStrategy Adds 10,000 BTC to Treasury, Now Holds Over 200,000 BTC', summary:'Michael Saylor\'s firm continues its aggressive Bitcoin accumulation strategy.', source:'Forbes Crypto', time:'12h ago', img:'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&q=70',
+    body:`MicroStrategy, the business intelligence company turned de facto Bitcoin holding vehicle, has announced the purchase of an additional 10,000 BTC for approximately $975 million, bringing its total holdings to over 200,000 BTC — worth roughly $20 billion at current market prices.\n\nThe purchase was funded through a combination of proceeds from a convertible note offering and cash from operations. MicroStrategy has now spent over $6.1 billion acquiring Bitcoin at an average price of approximately $30,500 per coin, representing an unrealised gain of over 200% on its total position.\n\nExecutive Chairman Michael Saylor, who has become one of Bitcoin's most prominent corporate advocates, posted on X: "200,000 Bitcoin secured. The strategy is working."\n\nMicroStrategy's approach — leveraging low-interest debt to acquire an appreciating scarce asset — has been widely discussed in corporate finance circles. Several smaller public companies have attempted to replicate the model, though with more modest scale.\n\nCritics argue the strategy exposes MicroStrategy shareholders to extreme Bitcoin volatility and that the company's stock, which trades at a significant premium to its Bitcoin NAV, is effectively a leveraged bet on the asset. Supporters counter that Bitcoin's long-term trajectory justifies the approach.\n\nMSTR shares, which have become a popular proxy for Bitcoin exposure in traditional brokerage accounts, rose 6.4% following the announcement. Options activity on the stock also spiked, suggesting traders expect continued volatility in both directions.` },
+  { id:7, category:'ethereum', tag:'Ethereum', tagColor:'#6c63ff', headline:'Ethereum Layer-2 Networks Process More Transactions Than Ethereum Mainnet', summary:'Optimistic rollups and ZK-rollups now handle the majority of Ethereum ecosystem activity.', source:'L2Beat', time:'1d ago', img:'https://images.unsplash.com/photo-1565372195458-9de0b320ef04?w=400&q=70',
+    body:`For the first time, Ethereum's Layer-2 scaling networks collectively processed more daily transactions than the Ethereum mainnet itself — a milestone that validates years of the Ethereum community's rollup-centric scaling roadmap.\n\nData from L2Beat shows that Arbitrum, Optimism, Base, and zkSync Era combined handled approximately 4.2 million transactions in a single day, compared to Ethereum mainnet's 1.1 million. The figure excludes internal protocol transactions and counts only user-initiated activity.\n\nBase, Coinbase's Layer-2 network built on the OP Stack, has been the fastest growing, driven by the explosive popularity of the social app Farcaster and the memecoin trading platform friend.tech. Arbitrum remains the leader by TVL, anchored by DeFi protocols like GMX and Radiant Capital.\n\nGas fees on Layer-2 networks average $0.01–0.08 per transaction compared to $2–15 on mainnet during periods of high congestion, making everyday use cases economically viable for the first time.\n\n"This is what we've been building toward," said Ethereum co-founder Vitalik Buterin in a blog post. "Layer-2 as the primary user-facing layer, with mainnet as the settlement and data availability backbone. The architecture is working."\n\nThe Dencun upgrade, which introduced proto-danksharding (EIP-4844), further reduced Layer-2 data costs by up to 90%, accelerating adoption. The next major upgrade, Pectra, is expected to push throughput even further through increased blob capacity.` },
+  { id:8, category:'defi', tag:'DeFi', tagColor:'#22d3a0', headline:'Uniswap v4 Launches with Hooks Feature, Reshaping DEX Landscape Forever', summary:'The latest version of the popular DEX introduces customizable pool logic through hooks.', source:'The Block', time:'1d ago', img:'https://images.unsplash.com/photo-1580048915913-4f8f5cb481c4?w=400&q=70',
+    body:`Uniswap v4, the most significant upgrade to the world's largest decentralised exchange, has gone live on Ethereum mainnet — introducing a powerful new "hooks" system that allows developers to attach custom logic to liquidity pools.\n\nHooks are smart contracts that can execute code at specific points in a pool's lifecycle: before or after a swap, before or after liquidity is added or removed. This enables an entirely new category of AMM designs without requiring the Uniswap core team to build them.\n\nEarly examples already live on mainnet include dynamic fee pools that adjust based on volatility, limit-order functionality built into AMM pools, liquidity-as-collateral features, and MEV (maximal extractable value) capture mechanisms that redirect value back to liquidity providers.\n\n"Hooks transform Uniswap from a product into a platform," said Uniswap Labs CEO Hayden Adams. "We're giving developers the primitives to build financial infrastructure we haven't even imagined yet."\n\nThe update also introduces a singleton contract architecture — replacing the previous model where each pool was a separate contract — dramatically reducing gas costs for multi-hop swaps and new pool deployment by up to 99%.\n\nUNI token surged 18% on the news, though analysts note that Uniswap's protocol fee governance remains contentious. A governance vote to activate protocol fees failed earlier this year, and the v4 launch has reignited debate about whether and how UNI holders should capture value from the protocol's dominance.` },
+  { id:9, category:'regulation', tag:'Regulation', tagColor:'#ff5b6e', headline:'EU MiCA Regulation Takes Full Effect, Bringing Clarity to Crypto Industry', summary:'Europe\'s comprehensive crypto regulation framework becomes fully enforceable across member states.', source:'CoinDesk', time:'2d ago', img:'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&q=70',
+    body:`The European Union's Markets in Crypto-Assets (MiCA) regulation has come into full effect across all 27 member states, marking the most significant step toward a comprehensive global crypto regulatory framework to date.\n\nMiCA, which was first proposed in 2020 and passed by the European Parliament in April 2023, establishes clear rules for crypto-asset service providers (CASPs), stablecoin issuers, and token offerings. Its two-phase implementation is now complete, with all provisions — including those governing asset-referenced tokens and e-money tokens — now fully enforceable.\n\nKey requirements under MiCA include mandatory licensing for CASPs operating in the EU, strict reserve and redemption requirements for stablecoin issuers, market abuse prohibitions mirroring those in traditional finance, and comprehensive disclosure obligations for token projects.\n\nSeveral major exchanges, including Coinbase, Kraken, and Bitstamp, had pre-registered for CASP licenses and are among the first fully compliant operators. Binance, which has faced regulatory pressure across multiple jurisdictions, confirmed it has obtained its MiCA license through its European subsidiary.\n\nThe regulation has triggered mixed reactions. Traditional finance incumbents and larger crypto firms have broadly welcomed the clarity, while smaller projects and DeFi advocates warn that compliance costs could stifle innovation and push activity to less-regulated jurisdictions.\n\n"MiCA is imperfect, but it's a foundation," said Patrick Hansen of Circle, whose USDC stablecoin is one of the first to meet MiCA's e-money token requirements. "The EU has given the world a template. The question now is whether other major economies follow."` },
 ];
 
 let currentNewsFilter = 'all';
@@ -1534,7 +1522,7 @@ function renderNews() {
   filtered.forEach(news => {
     const card = document.createElement('div');
     card.className = 'news-card';
-    card.onclick = () => showToast('Opening: ' + news.headline, 'info');
+    card.onclick = () => openNewsModal(news);
     card.innerHTML = `
       <img class="news-img" src="${news.img}" alt="${news.tag}" loading="lazy" onerror="this.style.display='none'"/>
       <div class="news-body">
@@ -1546,6 +1534,41 @@ function renderNews() {
     grid.appendChild(card);
   });
 }
+
+function openNewsModal(news) {
+  const overlay = document.getElementById('news-modal');
+  if (!overlay) return;
+
+  document.getElementById('news-modal-tag').textContent = news.tag;
+  document.getElementById('news-modal-tag').style.cssText =
+    `background:${news.tagColor}22;color:${news.tagColor};`;
+  document.getElementById('news-modal-headline').textContent = news.headline;
+  document.getElementById('news-modal-meta').textContent = `${news.source} • ${news.time}`;
+  document.getElementById('news-modal-img').src = news.img;
+  document.getElementById('news-modal-img').alt = news.tag;
+
+  // Render body paragraphs
+  const bodyEl = document.getElementById('news-modal-body');
+  bodyEl.innerHTML = news.body
+    .split('\n\n')
+    .map(para => `<p>${escHtml(para)}</p>`)
+    .join('');
+
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeNewsModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  const overlay = document.getElementById('news-modal');
+  if (overlay) overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Allow ESC key to close news modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeNewsModal();
+});
 
 // =============================================
 // AI CHATBOT ENGINE
